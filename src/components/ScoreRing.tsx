@@ -38,7 +38,7 @@ export function ScoreRing({ band, label }: { band: ScoreBand | null; label: stri
     <div
       role="img"
       aria-label={label}
-      style={{ position: 'relative', width: SIZE, height: SIZE, margin: '6px auto 12px' }}
+      style={{ position: 'relative', width: SIZE, height: SIZE }}
     >
       <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden="true">
         <defs>

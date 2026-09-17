@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { useGo } from '@/lib/nav'
 import { Avatar, Banner, Card, Label, Rows } from './ui'
 import {
@@ -39,17 +40,19 @@ export function TeamWishes({
   celebrations,
   title = 'Birthdays and anniversaries',
   empty = 'Nothing in the next few days.',
+  style,
 }: {
   celebrations: Celebration[]
   title?: string
   empty?: string
+  style?: CSSProperties
 }) {
   const navigate = useGo()
   const today = celebrations.filter((c) => c.inDays === 0)
   const soon = celebrations.filter((c) => c.inDays > 0)
 
   return (
-    <Card padded>
+    <Card padded style={style ?? {}}>
       <Label>{title}</Label>
 
       {celebrations.length ? (

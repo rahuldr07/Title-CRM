@@ -38,7 +38,7 @@ import { useQcRules } from '@/state/qcRules'
 import { DEFAULT_RANGE, inRange, resolveRange } from '@/lib/range'
 import { useQcLog } from '@/lib/useQcLog'
 import { hhmm, hm, restCheck, shiftOf, worked } from '@/lib/workingDay'
-import { mayVisit, whoName } from '@/lib/permissions'
+import { whoName } from '@/lib/permissions'
 import { scoreBand } from '@/lib/quality'
 import { celebrationsWithin } from '@/lib/celebrations'
 import { fmtDT, fmtDate, parseUsDate } from '@/lib/format'
@@ -452,94 +452,83 @@ export default function MyWork() {
         />
       </Kpis>
 
-      {/* Each column is one grid item, so the ring sits directly under the leave
-          card and "Around the team" directly under the month, rather than both
-          waiting for the taller side of a shared row. */}
-      <div className="two" style={{ marginTop: 16 }}>
-        <div style={{ display: 'grid', gap: 20, alignContent: 'start' }}>
-          <Card padded>
-            <Label>Your {month}</Label>
-            {(
-              [
-                ['Days present', `${att.present} of ${att.working}`],
-                ['Paid leave taken', att.paidLeave],
-                ['Unpaid days', att.lop],
-                ['Holidays in the month', att.hol],
-              ] as [string, string | number][]
-            ).map((r) => (
-              <DetailRow key={r[0]} label={r[0]} value={<b className="mono">{r[1]}</b>} />
-            ))}
-            {nextHoliday ? (
-              <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 12 }}>
-                Next holiday: <b>{nextHoliday.h.n}</b> on {nextHoliday.h.d}
-                {nextHoliday.h.opt ? ' — optional' : ''}.
-              </p>
-            ) : null}
-          </Card>
-
-          {theirs.length ? (
-            <TeamWishes celebrations={theirs} title="Around the team" />
-          ) : null}
-        </div>
-
-        <div style={{ display: 'grid', gap: 20, alignContent: 'start' }}>
-          <Card padded>
-            <Label>Leave you have left</Label>
-            {LEAVETYPES.filter((t) => t.annual > 0).map((t) => {
-              const b = balances[t.k]
-              return (
-                <div
-                  key={t.k}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '130px 1fr 78px',
-                    gap: 11,
-                    alignItems: 'center',
-                    padding: '6px 0',
-                    fontSize: 'var(--t-body)',
-                  }}
-                >
-                  <span>
-                    <Chip kind={t.c}>{t.n}</Chip>
-                  </span>
-                  <Bar value={b.left} max={Math.max(1, b.earned)} color="var(--brand2)" />
-                  <span className="mono" style={{ textAlign: 'right' }}>
-                    {b.left} of {b.earned}
-                  </span>
-                </div>
-              )
-            })}
-            <div style={{ marginTop: 12 }}>
-              <Btn variant="ghost" small onClick={() => navigate({ to: '/leave' })}>
-                Apply for leave
-              </Btn>
-            </div>
-          </Card>
-
-          <Card padded>
-            <Label>Your performance</Label>
-            <ScoreRing
-              band={band}
-              label={band ? `Quality score ${band.pct}%, ${band.label}` : 'No quality score to show'}
-            />
-            <p className="gr" style={{ fontSize: 'var(--t-small)', margin: 0, textAlign: 'center' }}>
-              {!showScores
-                ? 'Scores are not shown to the person rated on this account.'
-                : qcLog.isPending
-                  ? 'Loading your checks…'
-                  : band && qavg !== null
-                    ? `Quality score — ${qavg.toFixed(2)} of 5 from ${rated.length} checks, ${range.label}.`
-                    : 'Nothing of yours has been checked in this range.'}
+      {/* The ring shares a row with "Around the team" so the two cards stretch to
+          one height. `-2 / -1` is the last column at any width — the second on a
+          desktop, the only one once `.two` collapses — and dense packing lets
+          "Around the team" take the free cell beside it although it comes later,
+          which keeps the ring directly under the leave card on a phone. */}
+      <div className="two" style={{ marginTop: 16, gridAutoFlow: 'row dense' }}>
+        <Card padded>
+          <Label>Your {month}</Label>
+          {(
+            [
+              ['Days present', `${att.present} of ${att.working}`],
+              ['Paid leave taken', att.paidLeave],
+              ['Unpaid days', att.lop],
+              ['Holidays in the month', att.hol],
+            ] as [string, string | number][]
+          ).map((r) => (
+            <DetailRow key={r[0]} label={r[0]} value={<b className="mono">{r[1]}</b>} />
+          ))}
+          {nextHoliday ? (
+            <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 12 }}>
+              Next holiday: <b>{nextHoliday.h.n}</b> on {nextHoliday.h.d}
+              {nextHoliday.h.opt ? ' — optional' : ''}.
             </p>
-            {showScores && mayVisit(me, 'myperf') ? (
-              <div style={{ marginTop: 12, textAlign: 'center' }}>
-                <Btn variant="ghost" small onClick={() => navigate({ to: '/myperf' })}>
-                  How I’m doing
-                </Btn>
+          ) : null}
+        </Card>
+
+        <Card padded>
+          <Label>Leave you have left</Label>
+          {LEAVETYPES.filter((t) => t.annual > 0).map((t) => {
+            const b = balances[t.k]
+            return (
+              <div
+                key={t.k}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '130px 1fr 78px',
+                  gap: 11,
+                  alignItems: 'center',
+                  padding: '6px 0',
+                  fontSize: 'var(--t-body)',
+                }}
+              >
+                <span>
+                  <Chip kind={t.c}>{t.n}</Chip>
+                </span>
+                <Bar value={b.left} max={Math.max(1, b.earned)} color="var(--brand2)" />
+                <span className="mono" style={{ textAlign: 'right' }}>
+                  {b.left} of {b.earned}
+                </span>
               </div>
-            ) : null}
-          </Card>
-        </div>
+            )
+          })}
+          <div style={{ marginTop: 12 }}>
+            <Btn variant="ghost" small onClick={() => navigate({ to: '/leave' })}>
+              Apply for leave
+            </Btn>
+          </div>
+        </Card>
+
+        <Card
+          padded
+          style={{
+            gridColumn: '-2 / -1',
+            alignSelf: 'stretch',
+            display: 'grid',
+            placeItems: 'center',
+          }}
+        >
+          <ScoreRing
+            band={band}
+            label={band ? `Quality score ${band.pct}%, ${band.label}` : 'No quality score to show'}
+          />
+        </Card>
+
+        {theirs.length ? (
+          <TeamWishes celebrations={theirs} title="Around the team" style={{ alignSelf: 'stretch' }} />
+        ) : null}
       </div>
 
       {risky.length ? (
