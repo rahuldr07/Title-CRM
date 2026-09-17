@@ -27,7 +27,9 @@ import { useTimeclock } from '@/state/timeclock'
 import { UpdateForm } from './mywork/UpdateForm'
 import { SwapForm } from './mywork/SwapForm'
 import { OvertimeForm } from './mywork/OvertimeForm'
-import { postUpdate, useUpdates } from '@/state/updates'
+import { NeedsYou } from './mywork/NeedsYou'
+import { fromYourDepartment, postUpdate, useUpdates } from '@/state/updates'
+import { unreadTotal, useChats } from '@/state/chats'
 import { STAFF, HOLIDAYS } from '@/data/people'
 import { UPDKIND } from '@/data/production'
 import { ATT, LEAVETYPES, PAYMONTHS } from '@/data/hrms'
@@ -90,11 +92,8 @@ export default function MyWork() {
   const theirs = wishes.filter((c) => c.person.id !== me.id)
 
   const myUpdates = updates.filter((u) => u.who === me.id).slice(0, 4)
-  const deptUpdates = updates.filter(
-    (u) =>
-      u.who !== me.id &&
-      (STAFF.find((x) => x.id === u.who)?.dep ?? []).some((d) => me.dep.includes(d)),
-  )
+  const deptUpdates = fromYourDepartment(updates, me)
+  const unread = unreadTotal(useChats(), me.id)
 
   const workedToday = mark?.out ? worked(mark) - (mark.breakMins ?? 0) : 0
 
@@ -156,17 +155,7 @@ export default function MyWork() {
     </p>
   )
 
-  const openDeptUpdates = () =>
-    openModal({
-      title: 'From your department',
-      body: deptUpdates.length ? (
-        <Rows bare>{deptUpdates.map((u) => updateRow(u, true))}</Rows>
-      ) : (
-        <p className="gr" style={{ fontSize: 'var(--t-body)', margin: 0 }}>
-          Nothing from the rest of {me.dep[0] || 'your department'} recently.
-        </p>
-      ),
-    })
+  const openNeedsYou = () => openModal({ title: 'Needs you', body: <NeedsYou me={me} /> })
 
   const myDone = () =>
     openModal({
@@ -327,9 +316,11 @@ export default function MyWork() {
         sub={`${me.dep.join(' · ') || 'No department'} · target ${me.cap} a day`}
         actions={
           <>
-            <button type="button" className="needsYou" onClick={openDeptUpdates}>
+            <button type="button" className="needsYou" onClick={openNeedsYou}>
               <span>Needs you</span>
-              {deptUpdates.length ? <span className="bdg">{deptUpdates.length}</span> : null}
+              {deptUpdates.length + unread ? (
+                <span className="bdg">{deptUpdates.length + unread}</span>
+              ) : null}
               <span className="sw" aria-hidden="true">
                 <i />
               </span>

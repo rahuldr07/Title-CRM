@@ -604,6 +604,84 @@ body *::-webkit-scrollbar-thumb:hover {
 }
 
 /*
+ * The chat behind "Needs you". design.css has no message thread, so these are
+ * additions rather than corrections. Your own messages sit right on
+ * --brandsoft and the other person's left on --tint2 with a hairline, which
+ * keeps both readable in dark mode — --brand with white text does not reach
+ * 3:1 there. The thread scrolls inside the modal so the reply box stays put.
+ */
+.chat-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--hair);
+}
+.chat-sub { font-size: var(--t-label); margin-top: 2px; }
+.chat-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 160px;
+  max-height: min(46vh, 380px);
+  overflow-y: auto;
+  padding: 2px 2px 8px;
+}
+.chat-context {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--tint);
+  border: 1px dashed var(--hair);
+  font-size: var(--t-small);
+  margin-bottom: 4px;
+}
+.chat-msg {
+  max-width: 80%;
+  padding: 8px 12px;
+  border-radius: 13px;
+  font-size: var(--t-body);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+.chat-msg.me { align-self: flex-end; background: var(--brandsoft); border-bottom-right-radius: 4px; }
+.chat-msg.them {
+  align-self: flex-start;
+  background: var(--tint2);
+  border: 1px solid var(--hair);
+  border-bottom-left-radius: 4px;
+}
+.chat-empty { margin: auto 0; text-align: center; font-size: var(--t-small); }
+.chat-compose {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hair);
+}
+.chat-compose textarea { resize: none; font-size: var(--t-body); }
+.chat-last { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-go { font-size: var(--t-label); color: var(--brand); font-weight: 600; white-space: nowrap; }
+.chat-unread {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: var(--bad);
+  color: #fff;
+  font-size: var(--t-micro);
+  font-weight: 700;
+}
+
+/*
  * `.mat`'s header cells carry none of `.mat td`'s padding (design.css). Tailwind's
  * preflight zeroes table-cell padding globally, and design.css only redeclares it
  * for `td` — so every `.mat` table's header row (Invoicing's by-client-and-month
