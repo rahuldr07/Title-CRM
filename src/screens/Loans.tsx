@@ -129,7 +129,7 @@ function Loans() {
         />
       </Kpis>
 
-      <div className="two brkout" style={{ marginTop: 16, alignItems: 'start' }}>
+      <div className="brkout" style={{ marginTop: 16 }}>
         <div>
           <div className="fbar">
             {TABS.map(([key, label]) => (
@@ -284,62 +284,62 @@ function Loans() {
             </Card>
           )}
         </div>
-
-        {canAll ? (
-          <aside>
-            <Card padded style={{ position: 'sticky', top: 76 }}>
-              <div className="lb">Payroll — {previewMonth} preview</div>
-              <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 4 }}>
-                Deduction line-items this module will inject
-              </p>
-              {previewRows.length ? (
-                <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-                  {previewRows.map((d) => (
-                    <div key={d.loan.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--t-small)' }}>
-                      <span>
-                        {whoName(d.loan.who)} · {d.loan.kind === 'loan' ? 'EMI' : 'advance recovery'}
-                      </span>
-                      <span className="mono">{inr(d.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 10 }}>
-                  Nothing due next run.
-                </p>
-              )}
-              <p style={{ fontSize: 'var(--t-small)', marginTop: 12 }} className="bnr v" >
-                Injected automatically once the run advances — payslips print “Loan EMI ₹x · balance after
-                ₹y”.
-              </p>
-            </Card>
-
-            <Card padded style={{ marginTop: 16 }}>
-              <div className="lb">Policy limits</div>
-              <div style={{ display: 'grid', gap: 8, marginTop: 10, fontSize: 'var(--t-small)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Advance</span>
-                  <b>≤ {LOAN_POLICY.advancePctOfNet}% of monthly net</b>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Loan</span>
-                  <b>≤ {LOAN_POLICY.loanMultipleOfGross}× monthly gross</b>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Concurrent</span>
-                  <b>1 loan + 1 advance</b>
-                </div>
-              </div>
-              <div className="bnr r" style={{ marginTop: 12 }}>
-                <span className="bi">⚑</span>
-                <div style={{ fontSize: 'var(--t-small)' }}>
-                  A request is decided by whoever holds pricing — never the person who asked for it.
-                </div>
-              </div>
-            </Card>
-          </aside>
-        ) : null}
       </div>
+
+      {canAll ? (
+        <div className="brkout" style={{ marginTop: 16, display: 'flex', gap: 16, alignItems: 'start' }}>
+          <Card padded style={{ flex: 1 }}>
+            <div className="lb">Payroll — {previewMonth} preview</div>
+            <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 4 }}>
+              Deduction line-items this module will inject
+            </p>
+            {previewRows.length ? (
+              <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+                {previewRows.map((d) => (
+                  <div key={d.loan.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--t-small)' }}>
+                    <span>
+                      {whoName(d.loan.who)} · {d.loan.kind === 'loan' ? 'EMI' : 'advance recovery'}
+                    </span>
+                    <span className="mono">{inr(d.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 10 }}>
+                Nothing due next run.
+              </p>
+            )}
+            <p style={{ fontSize: 'var(--t-small)', marginTop: 12 }} className="bnr v" >
+              Injected automatically once the run advances — payslips print “Loan EMI ₹x · balance after
+              ₹y”.
+            </p>
+          </Card>
+
+          <Card padded style={{ flex: 1 }}>
+            <div className="lb">Policy limits</div>
+            <div style={{ display: 'grid', gap: 8, marginTop: 10, fontSize: 'var(--t-small)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Advance</span>
+                <b>≤ {LOAN_POLICY.advancePctOfNet}% of monthly net</b>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Loan</span>
+                <b>≤ {LOAN_POLICY.loanMultipleOfGross}× monthly gross</b>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Concurrent</span>
+                <b>1 loan + 1 advance</b>
+              </div>
+            </div>
+            <div className="bnr r" style={{ marginTop: 12 }}>
+              <span className="bi">⚑</span>
+              <div style={{ fontSize: 'var(--t-small)' }}>
+                A request is decided by whoever holds pricing — never the person who asked for it.
+              </div>
+            </div>
+          </Card>
+        </div>
+      ) : null}
     </>
   )
 }
