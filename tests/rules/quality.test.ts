@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { QC_FIX, QC_REASONS } from '@/data/quality'
-import { QC_CRITERIA, QC_SCALE } from '@/lib/quality'
+import { QC_CRITERIA, QC_SCALE, markTone, scoreBand } from '@/lib/quality'
 
 /**
  * The rating vocabulary has to stay closed.
@@ -38,5 +38,31 @@ describe('the scale', () => {
     expect(QC_SCALE.map(([n]) => n)).toEqual([1, 2, 3, 4, 5])
     expect(QC_SCALE[0][2]).toBe('d')
     expect(QC_SCALE[4][2]).toBe('v')
+  })
+})
+
+describe('the band an average falls in', () => {
+  it('reads as a share of the top of the scale', () => {
+    expect(scoreBand(5).pct).toBe(100)
+    expect(scoreBand(4.62).pct).toBe(92)
+    expect(scoreBand(1).pct).toBe(20)
+  })
+
+  it('cuts at 4.5 and 4', () => {
+    expect(scoreBand(4.5).label).toBe('Excellent')
+    expect(scoreBand(4.49).tone).toBe('warn')
+    expect(scoreBand(4).tone).toBe('warn')
+    expect(scoreBand(3.99).tone).toBe('bad')
+  })
+
+  /* A person whose every mark was a 4 should not read better or worse on My
+     work than a single 4 reads on the ratings table. */
+  it('agrees with the mark tone on a whole number', () => {
+    for (const [n] of QC_SCALE) expect(scoreBand(n).tone).toBe(markTone(n))
+  })
+
+  it('never draws past a full ring', () => {
+    expect(scoreBand(7).pct).toBe(100)
+    expect(scoreBand(-1).pct).toBe(0)
   })
 })

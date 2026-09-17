@@ -159,6 +159,30 @@ export const QC_SCALE: [score: number, label: string, kind: ChipKind][] = [
 
 export const markTone = (v: number): 'bad' | 'warn' | 'ok' => (v < 4 ? 'bad' : v < 5 ? 'warn' : 'ok')
 
+export interface ScoreBand {
+  pct: number
+  label: string
+  tone: 'bad' | 'warn' | 'ok'
+  chip: ChipKind
+}
+
+/**
+ * Where an average score sits, for the ring on My work.
+ *
+ * An average is not a mark, so it cannot take `markTone`'s cut at 5 — one 4
+ * among twenty 5s would turn a person amber. It keeps the cut at 4, where a
+ * single mark stops being clean, so a whole number lands in the same tone as
+ * the mark it equals. It takes its own words rather than the scale's, because
+ * "Average" or "MIS" on a person's standing reads as a verdict on them.
+ */
+export function scoreBand(avg: number): ScoreBand {
+  const top = QC_SCALE[QC_SCALE.length - 1]?.[0] ?? 5
+  const pct = Math.round((Math.min(Math.max(avg, 0), top) / top) * 100)
+  if (avg >= 4.5) return { pct, label: 'Excellent', tone: 'ok', chip: 'v' }
+  if (avg >= 4) return { pct, label: 'Room to improve', tone: 'warn', chip: 'r' }
+  return { pct, label: 'Needs attention', tone: 'bad', chip: 'd' }
+}
+
 export const QC_CRITERIA: [
   name: string,
   field: keyof Pick<QcEntry, 'acc' | 'comp' | 'fmt'>,

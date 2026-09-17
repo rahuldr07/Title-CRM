@@ -20,6 +20,7 @@ import {
 import { SkeletonRows } from '@/components/async'
 import { TeamWishes, YourWish } from '@/components/Wishes'
 import { ScoreGauge } from '@/components/ScoreGauge'
+import { ScoreRing } from '@/components/ScoreRing'
 import { useSession } from '@/state/session'
 import { useUi } from '@/state/ui'
 import { useTimeclock } from '@/state/timeclock'
@@ -37,7 +38,8 @@ import { useQcRules } from '@/state/qcRules'
 import { DEFAULT_RANGE, inRange, resolveRange } from '@/lib/range'
 import { useQcLog } from '@/lib/useQcLog'
 import { hhmm, hm, restCheck, shiftOf, worked } from '@/lib/workingDay'
-import { whoName } from '@/lib/permissions'
+import { mayVisit, whoName } from '@/lib/permissions'
+import { scoreBand } from '@/lib/quality'
 import { celebrationsWithin } from '@/lib/celebrations'
 import { fmtDT, fmtDate, parseUsDate } from '@/lib/format'
 import { now } from '@/lib/clock'
@@ -69,6 +71,7 @@ export default function MyWork() {
   const rated = (qcLog.data ?? []).filter((x) => x.onName === me.n && inRange(x.d, range))
   const showScores = useQcRules().find((r) => r.k === 'see')?.on ?? false
   const qavg = rated.length ? rated.reduce((a, x) => a + x.avg, 0) / rated.length : null
+  const band = showScores && qavg !== null ? scoreBand(qavg) : null
 
   const shift = shiftOf(me)
   const mark = clock.markOf(me.id)
@@ -449,63 +452,94 @@ export default function MyWork() {
         />
       </Kpis>
 
+      {/* Each column is one grid item, so the ring sits directly under the leave
+          card and "Around the team" directly under the month, rather than both
+          waiting for the taller side of a shared row. */}
       <div className="two" style={{ marginTop: 16 }}>
-        <Card padded>
-          <Label>Your {month}</Label>
-          {(
-            [
-              ['Days present', `${att.present} of ${att.working}`],
-              ['Paid leave taken', att.paidLeave],
-              ['Unpaid days', att.lop],
-              ['Holidays in the month', att.hol],
-            ] as [string, string | number][]
-          ).map((r) => (
-            <DetailRow key={r[0]} label={r[0]} value={<b className="mono">{r[1]}</b>} />
-          ))}
-          {nextHoliday ? (
-            <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 12 }}>
-              Next holiday: <b>{nextHoliday.h.n}</b> on {nextHoliday.h.d}
-              {nextHoliday.h.opt ? ' — optional' : ''}.
-            </p>
+        <div style={{ display: 'grid', gap: 20, alignContent: 'start' }}>
+          <Card padded>
+            <Label>Your {month}</Label>
+            {(
+              [
+                ['Days present', `${att.present} of ${att.working}`],
+                ['Paid leave taken', att.paidLeave],
+                ['Unpaid days', att.lop],
+                ['Holidays in the month', att.hol],
+              ] as [string, string | number][]
+            ).map((r) => (
+              <DetailRow key={r[0]} label={r[0]} value={<b className="mono">{r[1]}</b>} />
+            ))}
+            {nextHoliday ? (
+              <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 12 }}>
+                Next holiday: <b>{nextHoliday.h.n}</b> on {nextHoliday.h.d}
+                {nextHoliday.h.opt ? ' — optional' : ''}.
+              </p>
+            ) : null}
+          </Card>
+
+          {theirs.length ? (
+            <TeamWishes celebrations={theirs} title="Around the team" />
           ) : null}
-        </Card>
+        </div>
 
-        <Card padded>
-          <Label>Leave you have left</Label>
-          {LEAVETYPES.filter((t) => t.annual > 0).map((t) => {
-            const b = balances[t.k]
-            return (
-              <div
-                key={t.k}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '130px 1fr 78px',
-                  gap: 11,
-                  alignItems: 'center',
-                  padding: '6px 0',
-                  fontSize: 'var(--t-body)',
-                }}
-              >
-                <span>
-                  <Chip kind={t.c}>{t.n}</Chip>
-                </span>
-                <Bar value={b.left} max={Math.max(1, b.earned)} color="var(--brand2)" />
-                <span className="mono" style={{ textAlign: 'right' }}>
-                  {b.left} of {b.earned}
-                </span>
+        <div style={{ display: 'grid', gap: 20, alignContent: 'start' }}>
+          <Card padded>
+            <Label>Leave you have left</Label>
+            {LEAVETYPES.filter((t) => t.annual > 0).map((t) => {
+              const b = balances[t.k]
+              return (
+                <div
+                  key={t.k}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '130px 1fr 78px',
+                    gap: 11,
+                    alignItems: 'center',
+                    padding: '6px 0',
+                    fontSize: 'var(--t-body)',
+                  }}
+                >
+                  <span>
+                    <Chip kind={t.c}>{t.n}</Chip>
+                  </span>
+                  <Bar value={b.left} max={Math.max(1, b.earned)} color="var(--brand2)" />
+                  <span className="mono" style={{ textAlign: 'right' }}>
+                    {b.left} of {b.earned}
+                  </span>
+                </div>
+              )
+            })}
+            <div style={{ marginTop: 12 }}>
+              <Btn variant="ghost" small onClick={() => navigate({ to: '/leave' })}>
+                Apply for leave
+              </Btn>
+            </div>
+          </Card>
+
+          <Card padded>
+            <Label>Your performance</Label>
+            <ScoreRing
+              band={band}
+              label={band ? `Quality score ${band.pct}%, ${band.label}` : 'No quality score to show'}
+            />
+            <p className="gr" style={{ fontSize: 'var(--t-small)', margin: 0, textAlign: 'center' }}>
+              {!showScores
+                ? 'Scores are not shown to the person rated on this account.'
+                : qcLog.isPending
+                  ? 'Loading your checks…'
+                  : band && qavg !== null
+                    ? `Quality score — ${qavg.toFixed(2)} of 5 from ${rated.length} checks, ${range.label}.`
+                    : 'Nothing of yours has been checked in this range.'}
+            </p>
+            {showScores && mayVisit(me, 'myperf') ? (
+              <div style={{ marginTop: 12, textAlign: 'center' }}>
+                <Btn variant="ghost" small onClick={() => navigate({ to: '/myperf' })}>
+                  How I’m doing
+                </Btn>
               </div>
-            )
-          })}
-          <div style={{ marginTop: 12 }}>
-            <Btn variant="ghost" small onClick={() => navigate({ to: '/leave' })}>
-              Apply for leave
-            </Btn>
-          </div>
-        </Card>
-
-        {theirs.length ? (
-          <TeamWishes celebrations={theirs} title="Around the team" />
-        ) : null}
+            ) : null}
+          </Card>
+        </div>
       </div>
 
       {risky.length ? (
