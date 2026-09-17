@@ -70,7 +70,7 @@ function Scores({
   if (!dels.length) {
     return (
       <>
-        <RangeBar id="q" value={range} onChange={setRange} showCustom={false} />
+        <RangeBar id="q" value={range} onChange={setRange} />
         <Card>
           <Empty
             icon="★"
@@ -99,7 +99,7 @@ function Scores({
   if (person) {
     return (
       <>
-        <RangeBar id="q" value={range} onChange={setRange} showCustom={false} />
+        <RangeBar id="q" value={range} onChange={setRange} />
         <QcStaffDetail
           name={person}
           rows={rows}
@@ -115,7 +115,7 @@ function Scores({
 
   return (
     <>
-      <RangeBar id="q" value={range} onChange={setRange} showCustom={false} />
+      <RangeBar id="q" value={range} onChange={setRange} />
 
       <Banner
         kind="r"
