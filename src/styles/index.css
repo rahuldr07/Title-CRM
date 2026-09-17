@@ -615,6 +615,34 @@ body *::-webkit-scrollbar-thumb:hover {
   padding: 12px 11px;
 }
 
+/*
+ * Loans' register + payroll-preview section, opted in via `.brkout`.
+ * `.wrap` caps every page's content at 1360px (design.css), so this
+ * two-column section — a wide table beside a fixed 320px sidebar — sits
+ * inside that cap too, wasting whatever the screen has beyond 1592px: 1360
+ * plus `.app`'s 232px sidebar column, the only place that width is named
+ * (design.css). Below that exact point `.wrap` isn't capped yet — it is
+ * already sized to fit — so the override only switches on where the cap
+ * actually starts binding; anything looser overflows `.wrap` by the width
+ * this rule would otherwise add on top of an already-uncapped page. The
+ * 26px matches `.wrap`'s own left padding, so the section's right edge
+ * lands on `.main`'s edge instead of stopping 26px short of it.
+ *
+ * `100vw` measures the window, not the space left of its scrollbar, so
+ * without `scrollbar-gutter: stable` below this overshoots by a scrollbar's
+ * width and puts a horizontal one on the page — the thing `.fbar`'s own
+ * comment above already calls out as the failure mode this file avoids.
+ */
+html {
+  scrollbar-gutter: stable;
+}
+@media (min-width: 1593px) {
+  .brkout {
+    width: calc(100vw - 232px - 26px);
+    max-width: none;
+  }
+}
+
 /* Design tokens exposed to Tailwind so utilities resolve to the design's palette. */
 @theme {
   --color-nav: #131a2b;

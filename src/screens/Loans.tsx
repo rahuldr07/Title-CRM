@@ -24,7 +24,7 @@ import { useLoanConfirm } from './loans/confirm'
 import { useLoans } from '@/state/loans'
 import type { LoanStatus } from '@/data/types'
 
-const COLS = '180px 130px 100px 90px 100px 90px 110px 1fr'
+const COLS = 'minmax(180px,1.6fr) 130px 100px 90px 100px 90px 110px 190px'
 const PAGE = 10
 
 const TABS: [LoanStatus | 'all', string][] = [
@@ -129,7 +129,7 @@ function Loans() {
         />
       </Kpis>
 
-      <div className="two" style={{ marginTop: 16, alignItems: 'start' }}>
+      <div className="two brkout" style={{ marginTop: 16, alignItems: 'start' }}>
         <div>
           <div className="fbar">
             {TABS.map(([key, label]) => (
@@ -166,7 +166,7 @@ function Loans() {
             <>
               <Card style={{ marginTop: 12 }}>
                 <div className="tsc">
-                  <div style={{ minWidth: 900 }}>
+                  <div style={{ minWidth: 990 }}>
                     <div className="trow h" style={{ gridTemplateColumns: COLS }}>
                       <span>Person</span>
                       <span>Type</span>
