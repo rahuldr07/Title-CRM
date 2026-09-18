@@ -1,15 +1,16 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useSearch } from '@tanstack/react-router'
 import { useGo } from '@/lib/nav'
 import { Avatar, Banner, Btn, Due, PageHead } from '@/components/ui'
 import { DataTable, type DataRow } from '@/components/DataTable'
 import { useSession } from '@/state/session'
 import { useUi } from '@/state/ui'
+import { rememberOrdersView, type OrdersView } from '@/state/ordersView'
 import { ORDERS } from '@/data/production'
 import { STAGES, STATUS } from '@/data/org'
 import { STAFF } from '@/data/people'
 import { SOON_HOURS, TZ, fmtDT, fmtDate, iso, orderChipKind, orderState, parseIso, type OrderState } from '@/lib/format'
-import { whoName } from '@/lib/permissions'
+import { routeNeeds, whoName } from '@/lib/permissions'
 import { hh, orderAtRisk, orderPlan } from '@/lib/sla'
 import { csvName, downloadCSV } from '@/lib/csv'
 
@@ -27,13 +28,36 @@ export default function Orders() {
   const { toast } = useUi()
   const navigate = useGo()
 
-  const { pill: pillParam } = useSearch({ from: '/orders' })
-  const [pill, setPill] = useState(pillParam ?? 'all')
-  const [product, setProduct] = useState('all')
-  const [client, setClient] = useState('all')
-  const [dept, setDept] = useState('all')
-  const [staff, setStaff] = useState('all')
-  const [dueDate, setDueDate] = useState('all')
+  /* The view is the URL, not local state. Local state was seeded from the URL
+     once, so arriving from the sidebar at /orders kept whatever pill was last
+     open, and leaving for an order and coming back lost every filter. */
+  const view = useSearch({ from: '/orders' })
+  const pill = view.pill ?? 'all'
+  const product = view.pr ?? 'all'
+  const client = view.cl ?? 'all'
+  const dept = view.dept ?? 'all'
+  const staff = view.staff ?? 'all'
+  const dueDate = view.due ?? 'all'
+
+  useEffect(() => rememberOrdersView(view), [view])
+
+  const setView = (patch: OrdersView) => {
+    const next = Object.fromEntries(
+      Object.entries({ ...view, ...patch }).filter(([, v]) => v && v !== 'all'),
+    ) as OrdersView
+    navigate({ to: '/orders', search: next, replace: true })
+  }
+  const setPill = (v: string) => setView({ pill: v })
+  const setProduct = (v: string) => setView({ pr: v })
+  const setClient = (v: string) => setView({ cl: v })
+  const setStaff = (v: string) => setView({ staff: v })
+  const setDueDate = (v: string) => setView({ due: v })
+
+  /* Staff can open this register but not Reports or the new-order form, so
+     neither button is offered to them — each led to "You do not have access". */
+  const reportsNeed = routeNeeds('reports')
+  const mayReport = !reportsNeed || can(reportsNeed)
+  const mayCreate = can('all')
 
   const scope = can('all') ? ORDERS : ORDERS.filter((o) => Object.values(o.a).includes(me.id))
 
@@ -118,13 +142,7 @@ export default function Orders() {
     dueDate !== 'all' ? <>due <b>{fmtDate(parseIso(dueDate))}</b></> : null,
   ].filter(Boolean)
 
-  const clearFilters = () => {
-    setStaff('all')
-    setDept('all')
-    setProduct('all')
-    setClient('all')
-    setDueDate('all')
-  }
+  const clearFilters = () => setView({ staff: 'all', dept: 'all', pr: 'all', cl: 'all', due: 'all' })
 
   const openWorkload = () =>
     navigate({
@@ -132,9 +150,12 @@ export default function Orders() {
       search: staff !== 'all' ? { tab: 'By staff', sw: staff } : { tab: 'By department', dw: dept },
     })
 
+  /* The fee is pricing, and staff can export this register; the column goes
+     out only to someone who may see it on screen. */
+  const withFee = can('pricing')
   const exportOrders = () => {
     const out = downloadCSV(csvName('orders'), [
-      ['Order', 'Client', 'Product', 'Property', 'County', 'State', 'Stage', 'Due', 'Received', 'Fee', ...STAGES],
+      ['Order', 'Client', 'Product', 'Property', 'County', 'State', 'Stage', 'Due', 'Received', ...(withFee ? ['Fee'] : []), ...STAGES],
       ...base.map((o) => [
         o.id,
         o.cl,
@@ -145,7 +166,7 @@ export default function Orders() {
         st(o.stt),
         fmtDT(o.due),
         fmtDT(o.recv),
-        o.fee,
+        ...(withFee ? [o.fee] : []),
         ...STAGES.map((s) => (o.a[s] ? whoName(o.a[s]) : '')),
       ]),
     ])
@@ -166,7 +187,7 @@ export default function Orders() {
             <Btn variant="ghost" onClick={exportOrders}>
               Export
             </Btn>
-            <Btn onClick={() => navigate({ to: '/orders/new' })}>＋ New order</Btn>
+            {mayCreate ? <Btn onClick={() => navigate({ to: '/orders/new' })}>＋ New order</Btn> : null}
           </>
         }
       />
@@ -190,12 +211,14 @@ export default function Orders() {
               <Btn variant="ghost" onClick={clearFilters}>
                 Clear
               </Btn>
-              <Btn onClick={openWorkload}>Workload report</Btn>
+              {mayReport ? <Btn onClick={openWorkload}>Workload report</Btn> : null}
             </>
           }
         >
-          {base.length} of {ORDERS.length}. For the completed-and-pending breakdown across today’s whole
-          intake, open the workload report.
+          {base.length} of {scope.length}.
+          {mayReport
+            ? ' For the completed-and-pending breakdown across today’s whole intake, open the workload report.'
+            : null}
         </Banner>
       ) : null}
 
@@ -230,12 +253,13 @@ export default function Orders() {
           {
             label: 'Department',
             value: dept,
-            onChange: (v) => {
-              setDept(v)
-              if (v !== 'all' && staff !== 'all' && !STAFF.find((s) => s.id === staff)?.dep.includes(v)) {
-                setStaff('all')
-              }
-            },
+            onChange: (v) =>
+              setView({
+                dept: v,
+                ...(v !== 'all' && staff !== 'all' && !STAFF.find((s) => s.id === staff)?.dep.includes(v)
+                  ? { staff: 'all' }
+                  : {}),
+              }),
             options: allFirst('All departments', [...STAGES]),
           },
           {

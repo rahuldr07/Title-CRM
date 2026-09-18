@@ -1,3 +1,4 @@
+import type { OrdersView } from './state/ordersView'
 import {
   createRootRoute,
   createRoute,
@@ -44,9 +45,14 @@ const routeTree = rootRoute.addChildren([
   createRoute({
     getParentRoute: () => rootRoute,
     path: '/orders',
-    /* The dashboard tiles deep-link into a filter, so the pill lives in the URL. */
-    validateSearch: (s: Record<string, unknown>): { pill?: string } =>
-      typeof s.pill === 'string' ? { pill: s.pill } : {},
+    /* The dashboard tiles deep-link into a filter, and an order's "← Orders"
+       returns to the view it came from, so the whole view lives in the URL. */
+    validateSearch: (s: Record<string, unknown>): OrdersView =>
+      Object.fromEntries(
+        (['pill', 'pr', 'cl', 'dept', 'staff', 'due'] as const)
+          .filter((k) => typeof s[k] === 'string' && s[k] !== 'all')
+          .map((k) => [k, s[k]]),
+      ) as OrdersView,
     component: lazyRouteComponent(() => import('./screens/Orders')),
   }),
   /* Static before dynamic, so "new" is the form and not an order id. */

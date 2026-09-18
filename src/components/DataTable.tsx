@@ -111,6 +111,15 @@ export function DataTable({
   const tm =
     (numbered ? '40px ' : '') + cols.map((x) => `minmax(${x.w ?? 100}px,${x.f ?? 1}fr)`).join(' ')
   const hasBar = !!(pills?.length || search || filters?.length || dateFilter)
+  const searchBox = search ? (
+    <input
+      className={`inp${wideFilters ? ' fsearch' : ''}`}
+      placeholder={search}
+      aria-label={search}
+      value={query}
+      onChange={(e) => setQuery(e.target.value)}
+    />
+  ) : null
 
   return (
     <>
@@ -129,6 +138,7 @@ export function DataTable({
                 {p.count != null ? <span className="n">{p.count}</span> : null}
               </button>
             ))}
+            {wideFilters && searchBox ? searchBox : null}
             <div className="sp">
               {(filters ?? []).map((f) => (
                 <Select
@@ -148,15 +158,7 @@ export function DataTable({
                   onChange={(e) => dateFilter.onChange(e.target.value || 'all')}
                 />
               ) : null}
-              {search ? (
-                <input
-                  className="inp"
-                  placeholder={search}
-                  aria-label={search}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              ) : null}
+              {!wideFilters && searchBox ? searchBox : null}
             </div>
           </div>
           <p className="cnt">

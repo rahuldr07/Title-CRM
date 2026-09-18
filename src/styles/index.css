@@ -361,21 +361,25 @@ h1.pg {
 /*
  * Orders' filter row, opted in via `.fbar.wide`.
  *
- * `.fbar` wraps (design.css), and six controls — four selects, a date and
- * search — are already wider than the space left beside the pills at most
- * desktop widths, so the group drops to a line of its own. There it still
- * only claims its own content width and `.fbar .sp`'s `margin-left: auto`
- * (above) pushes that block flush right, leaving the rest of the line empty.
- * `flex-basis: 100%` claims the whole line instead of just its content, and
- * `justify-content: space-between` spreads the controls across it at their
- * existing sizes — no control shrinks, so nothing truncates. Scoped above the
- * drawer breakpoint — below it, `.fbar .sp` above already goes full width on
- * its own terms.
+ * Six controls — four selects, a date and search — do not fit beside the
+ * pills. Spread across a line of their own with space-between, the selects
+ * sat far apart and search wrapped alone onto a third line at its natural
+ * width, too narrow for its own placeholder. Search now rides on the pills'
+ * line, as the design has it, taking the room to their right; the selects and
+ * the date take the next line together, left-aligned at the bar's own gap.
+ * Scoped above the drawer breakpoint — below it, `.fbar .sp` and `.fbar .inp`
+ * above already stack the controls full width.
  */
 @media (min-width: 821px) {
+  .fbar.wide .fsearch {
+    flex: 0 1 360px;
+    min-width: 240px;
+    margin-left: auto;
+  }
   .fbar.wide .sp {
     flex-basis: 100%;
-    justify-content: space-between;
+    margin-left: 0;
+    justify-content: flex-start;
   }
 }
 

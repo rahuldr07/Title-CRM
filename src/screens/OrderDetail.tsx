@@ -19,6 +19,7 @@ import {
 } from '@/components/ui'
 import { useNotBuilt } from '@/components/notBuilt'
 import { useSession } from '@/state/session'
+import { lastOrdersView } from '@/state/ordersView'
 import { useUi } from '@/state/ui'
 import { useQcRules } from '@/state/qcRules'
 import { useRules } from '@/state/rules'
@@ -104,7 +105,7 @@ export default function OrderDetail() {
   if (!base) {
     return (
       <>
-        <Btn variant="ghost" small style={{ marginBottom: 14 }} onClick={() => navigate({ to: '/orders' })}>
+        <Btn variant="ghost" small style={{ marginBottom: 14 }} onClick={() => navigate({ to: '/orders', search: lastOrdersView() })}>
           ← Orders
         </Btn>
         <PageHead
@@ -115,7 +116,7 @@ export default function OrderDetail() {
           <Empty
             icon="·"
             action={
-              <Btn small onClick={() => navigate({ to: '/orders' })}>
+              <Btn small onClick={() => navigate({ to: '/orders', search: lastOrdersView() })}>
                 Back to orders
               </Btn>
             }
@@ -323,7 +324,7 @@ export default function OrderDetail() {
 
   return (
     <>
-      <Btn variant="ghost" small style={{ marginBottom: 14 }} onClick={() => navigate({ to: '/orders' })}>
+      <Btn variant="ghost" small style={{ marginBottom: 14 }} onClick={() => navigate({ to: '/orders', search: lastOrdersView() })}>
         ← Orders
       </Btn>
 
