@@ -55,7 +55,7 @@ await page.goto(BASE + '/signin', { waitUntil: 'domcontentloaded', timeout: 15_0
 await page.waitForSelector('main input', { timeout: 10_000 })
 await page.locator('main input[type="email"]').fill(EMAIL)
 await page.locator('main input[type="password"]').fill(PASSWORD)
-await page.getByRole('button', { name: /sign in/i }).click()
+await page.getByRole('button', { name: /^sign in$/i }).click()
 try {
   await page.waitForURL((u) => !u.pathname.startsWith('/signin'), { timeout: 15_000 })
 } catch {

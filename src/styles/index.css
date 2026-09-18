@@ -308,23 +308,416 @@ h1.pg {
 }
 
 /*
- * The signed-out shell. No sidebar and no top bar, so the page supplies its own
- * ground and a column the width of the thing standing in it — which is one mark
- * and two fields, not the full 1360px the app content gets.
+ * The signed-out shell. No sidebar and no top bar; the sign-in page is the only
+ * thing that stands in it, and it is a full-bleed split screen, so the shell
+ * gives it the whole viewport rather than the app's padded 1360px column.
  */
 .authshell {
   min-height: 100vh;
   background: var(--bg);
-  display: flex;
-  justify-content: center;
 }
 .authshell .wrap {
-  max-width: 480px;
-  padding-top: clamp(40px, 11vh, 120px);
+  max-width: none;
+  padding: 0;
 }
 .authcol {
   max-width: 400px;
   margin: 0 auto;
+}
+
+/*
+ * The sign-in page: the company's story on the left, the form on the right.
+ * design.css has no page like it, so all of this is addition. Its colours are
+ * scoped tokens on .si — the company's teal is not the app's indigo — with a
+ * dark set below, and the street along the bottom is an SVG that reads them.
+ * Text keeps to ink under the no-grey-text rule; the hierarchy is size and
+ * weight. Below 980px the story panel goes and the form stands alone.
+ */
+.si {
+  --si-teal: #136b8a;
+  --si-on-teal: #fff;
+  --si-navy: #0f2d44;
+  --si-ring: rgba(19, 107, 138, 0.2);
+  --si-line: #d5dde5;
+  --si-tile: #e6eef3;
+  --si-sky1: #e2edf5;
+  --si-sky2: #f7fafc;
+  --si-slant-a: rgba(19, 107, 138, 0.5);
+  --si-slant-b: rgba(12, 74, 102, 0.94);
+  --si-wall: #eef1f4;
+  --si-shade: #d3dae2;
+  --si-roof: #5f6d7b;
+  --si-roof2: #4b5866;
+  --si-glass: #9db3c5;
+  --si-door: #6d7f90;
+  --si-tree: #86a08a;
+  --si-lawn: #93b08a;
+  --si-kerb: #c9d1d8;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  min-height: 100vh;
+}
+body.dark .si {
+  --si-teal: #5cb8d6;
+  --si-on-teal: #062230;
+  --si-navy: var(--ink);
+  --si-ring: rgba(92, 184, 214, 0.25);
+  --si-line: var(--hair);
+  --si-tile: #1a2a42;
+  --si-sky1: #10203a;
+  --si-sky2: #0b1120;
+  --si-slant-a: rgba(40, 130, 160, 0.4);
+  --si-slant-b: rgba(20, 90, 120, 0.9);
+  --si-wall: #2a3950;
+  --si-shade: #212e46;
+  --si-roof: #1a2436;
+  --si-roof2: #131b2a;
+  --si-glass: #e2b65c;
+  --si-door: #3a4a62;
+  --si-tree: #20392f;
+  --si-lawn: #1b3227;
+  --si-kerb: #2c3a50;
+}
+
+.si-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--si-sky1), var(--si-sky2) 72%);
+}
+.si-hero-in {
+  padding: clamp(40px, 8.5vh, 88px) 48px 8px clamp(32px, 12vw, 186px);
+}
+.si-title {
+  margin: 30px 0 14px;
+  font-size: var(--t-display);
+  font-weight: 650;
+  line-height: 1.22;
+  letter-spacing: -0.02em;
+  color: var(--si-navy);
+}
+.si-lede {
+  max-width: 440px;
+  margin: 0;
+  font-size: var(--t-lead);
+  line-height: 1.6;
+}
+.si-feats {
+  list-style: none;
+  margin: 30px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 18px;
+}
+.si-feats li {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.si-tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 13px;
+  background: var(--si-tile);
+  color: var(--si-navy);
+}
+.si-feats b {
+  display: block;
+  font-size: var(--t-body);
+  font-weight: 600;
+  color: var(--si-navy);
+}
+.si-feats b + span {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--t-small);
+}
+.si-scene {
+  position: relative;
+  flex: 1;
+  min-height: 230px;
+}
+.si-street {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 40%);
+  mask-image: linear-gradient(to bottom, transparent, #000 40%);
+}
+.si-slant {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 38%;
+  height: 82%;
+  background: linear-gradient(165deg, var(--si-slant-a), var(--si-slant-b));
+  clip-path: polygon(0 0, 100% 100%, 0 100%);
+}
+
+.si-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  background: var(--bg);
+}
+.si-card {
+  width: 100%;
+  max-width: 560px;
+  padding: 44px clamp(22px, 5vw, 44px) 32px;
+  background: var(--card);
+  border: 1px solid var(--hair);
+  border-radius: 13px;
+  box-shadow: var(--sh1);
+}
+.si-card-mark {
+  text-align: center;
+}
+/* The logo is a flat image on white: multiplied, the white takes the page's
+   tint on a light ground; on a dark one it keeps a plate of its own. The blend
+   sits on the crop box, not the image inside it — the box's transform makes it
+   a stacking context, and an image blending inside one blends with nothing. */
+.si .si-logo {
+  display: inline-block;
+  vertical-align: top;
+}
+.si-logo-crop {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  vertical-align: top;
+  mix-blend-mode: multiply;
+}
+.si-logo-crop .si-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 46%;
+}
+/* The mark starts 11% into its own file; pull it back to the text edge. On
+   a dark ground the whole plate shows, so the plate's edge is the one to align. */
+.si-hero-in .si-logo-crop {
+  transform: translateX(-11%);
+}
+body.dark .si-logo-crop {
+  mix-blend-mode: normal;
+  background: #fff;
+  border-radius: 12px;
+}
+body.dark .si-hero-in .si-logo-crop {
+  transform: none;
+}
+.si-wordmark {
+  font-size: var(--t-h1);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--si-teal);
+}
+.si-welcome {
+  margin: 18px 0 6px;
+  text-align: center;
+  font-size: var(--t-display);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--si-navy);
+}
+.si-sub {
+  margin: 0 0 28px;
+  text-align: center;
+  font-size: var(--t-lead);
+}
+.si-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.si-card .fld label {
+  margin-bottom: 8px;
+  font-size: var(--t-body);
+  font-weight: 500;
+  color: var(--ink);
+}
+.si-inp {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.si-inp > svg {
+  position: absolute;
+  left: 15px;
+  opacity: 0.7;
+  pointer-events: none;
+}
+.si-inp .inp {
+  height: 50px;
+  padding: 0 48px;
+  font-size: var(--t-body);
+  background: var(--card);
+  border-color: var(--si-line);
+}
+.si-inp .inp:focus {
+  background: var(--card);
+  border-color: var(--si-teal);
+  box-shadow: 0 0 0 3px var(--si-ring);
+}
+.si-eye {
+  position: absolute;
+  right: 7px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink);
+  opacity: 0.75;
+  cursor: pointer;
+}
+.si-eye:hover {
+  background: var(--tint2);
+  opacity: 1;
+}
+.si-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.si-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--t-body);
+  cursor: pointer;
+}
+.si-check input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--si-teal);
+}
+.si-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--si-teal);
+  font-size: var(--t-body);
+  font-weight: 600;
+  cursor: pointer;
+}
+.si-link:hover {
+  text-decoration: underline;
+}
+.si-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 52px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--si-teal);
+  color: var(--si-on-teal);
+  font-size: var(--t-lead);
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.si-submit:hover {
+  filter: brightness(1.07);
+}
+.si-submit:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+.si-submit:focus-visible,
+.si-ms:focus-visible,
+.si-link:focus-visible,
+.si-eye:focus-visible {
+  outline: 3px solid var(--si-ring);
+  outline-offset: 2px;
+}
+.si-or {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 28px 0 22px;
+  font-size: var(--t-small);
+}
+.si-or::before,
+.si-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--hair);
+}
+.si-ms {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  height: 52px;
+  border: 1px solid var(--si-line);
+  border-radius: 9px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: var(--t-body);
+  font-weight: 500;
+  cursor: pointer;
+}
+.si-ms:hover {
+  background: var(--tint);
+}
+.si-note {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--si-tile);
+  font-size: var(--t-small);
+  line-height: 1.5;
+}
+.si-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 30px 0 0;
+  font-size: var(--t-label);
+}
+.si-demo {
+  max-width: 560px;
+  margin: 16px 0 0;
+  text-align: center;
+  font-size: var(--t-small);
+}
+
+@media (max-width: 980px) {
+  .si {
+    grid-template-columns: 1fr;
+  }
+  .si-hero {
+    display: none;
+  }
+}
+@media (max-width: 520px) {
+  .si-side {
+    justify-content: flex-start;
+    padding: 20px 16px;
+  }
+  .si-card {
+    padding: 28px 18px 24px;
+  }
 }
 
 /*

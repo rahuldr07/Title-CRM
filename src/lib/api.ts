@@ -75,12 +75,14 @@ export const fetchMe = (tenantId: string | null) => api.get<Me>('/me', tenantId)
 export const fetchMemberships = (tenantId: string | null) =>
   api.get<Membership[]>('/memberships', tenantId)
 
-export async function startSession(email: string, password: string): Promise<void> {
+/* `rememberMe: false` is Better Auth's own switch for a session cookie that
+   ends with the browser rather than one that outlives it. */
+export async function startSession(email: string, password: string, rememberMe = true): Promise<void> {
   const res = await fetch('/api/auth/sign-in/email', {
     method: 'POST',
     credentials: 'include',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, rememberMe }),
   })
   if (!res.ok) {
     const detail = await res

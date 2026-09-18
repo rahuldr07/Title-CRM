@@ -82,7 +82,7 @@ async function signIn() {
     await page.waitForSelector('main input', { timeout: 10_000 })
     await page.locator('main input[type="email"]').fill(EMAIL)
     await page.locator('main input[type="password"]').fill(PASSWORD)
-    await page.getByRole('button', { name: /sign in/i }).click()
+    await page.getByRole('button', { name: /^sign in$/i }).click()
     await page.waitForURL((u) => !u.pathname.startsWith('/signin'), { timeout: 15_000 })
     return await page.context().storageState()
   } finally {

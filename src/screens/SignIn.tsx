@@ -11,6 +11,18 @@ import { can as capabilityOf, mayVisit, roleName } from '@/lib/permissions'
 import { DEMO_IDENTITY } from '@/lib/demo'
 import { ADMIN_EMAIL, checkCredentials } from '@/lib/credentials'
 import { ApiError, startSession } from '@/lib/api'
+import {
+  ArrowIcon,
+  BoltIcon,
+  EyeIcon,
+  LockIcon,
+  MailIcon,
+  MicrosoftMark,
+  ReportIcon,
+  SearchIcon,
+  ShieldIcon,
+  Street,
+} from './signin/art'
 
 const handled =
   <A extends unknown[]>(fn: (...args: A) => Promise<void>) =>
@@ -19,6 +31,49 @@ const handled =
       console.error('Sign-in:', error)
     })
   }
+
+const FEATURES = [
+  [SearchIcon, 'Title Searches', 'Accurate and reliable results'],
+  [ReportIcon, 'Property Reports', 'Detailed, comprehensive, on time'],
+  [BoltIcon, 'Electronic Ordering', 'Fast, secure, and easy'],
+  [ShieldIcon, 'Quality Control', 'Built on accuracy and trust'],
+] as const
+
+/* Neither of these has anything behind it yet — no mail is sent from this
+   application, and no Microsoft tenant is registered with Better Auth — so
+   each says so where it was asked, rather than doing nothing. */
+const NOTES = {
+  forgot: `Password reset by email is not set up yet. Ask your ${COMPANY_NAME} administrator for a new password.`,
+  microsoft: 'Microsoft sign-in is not switched on for this workspace yet. Use your work email and password.',
+} as const
+
+/* The logo file is a 200px square that is mostly white, with the mark in a
+   band across its middle. `crop` shows that band at the given width, so the
+   mark reads at the size the page gives it rather than a third of it. */
+function Mark({ height, crop }: { height: number; crop?: number }) {
+  const [broken, setBroken] = useState(false)
+  if (LOGO_URL && !broken && crop) {
+    return (
+      <span className="si-logo-crop" style={{ width: crop, height }}>
+        <img className="si-logo" src={LOGO_URL} alt={COMPANY_NAME} onError={() => setBroken(true)} />
+      </span>
+    )
+  }
+  return LOGO_URL && !broken ? (
+    <img
+      className="si-logo"
+      src={LOGO_URL}
+      alt={COMPANY_NAME}
+      height={height}
+      style={{ height, width: 'auto', maxWidth: '100%' }}
+      onError={() => setBroken(true)}
+    />
+  ) : (
+    <div className="si-wordmark">
+      <span aria-hidden="true">{COMPANY_GLYPH}</span> {COMPANY_NAME}
+    </div>
+  )
+}
 
 export default function SignIn() {
   const { me, authState, signInAs, signOut, can } = useSession()
@@ -33,7 +88,9 @@ export default function SignIn() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [logoBroken, setLogoBroken] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [remember, setRemember] = useState(true)
+  const [note, setNote] = useState<keyof typeof NOTES | null>(null)
 
   const landing = (personId: string) => {
     const person = STAFF.find((s) => s.id === personId)
@@ -48,9 +105,10 @@ export default function SignIn() {
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setError(null)
+    setNote(null)
     setBusy(true)
     try {
-      await startSession(email, password)
+      await startSession(email, password, remember)
       await queryClient.resetQueries()
       navigate({ to: next ?? '/dash', replace: true })
     } catch (err) {
@@ -80,76 +138,12 @@ export default function SignIn() {
     }
   }
 
-  const mark = (
-    <div style={{ textAlign: 'center', marginBottom: 26 }}>
-      {LOGO_URL && !logoBroken ? (
-        <img
-          src={LOGO_URL}
-          alt={COMPANY_NAME}
-          height={LOGO_HEIGHT}
-          style={{ height: LOGO_HEIGHT, width: 'auto', maxWidth: '100%' }}
-          onError={() => setLogoBroken(true)}
-        />
-      ) : (
-        <div style={{ fontSize: 'var(--t-h1)', fontWeight: 650, letterSpacing: '-0.02em' }}>
-          <span style={{ color: 'var(--brand)', marginRight: 8 }}>{COMPANY_GLYPH}</span>
-          {COMPANY_NAME}
-        </div>
-      )}
-    </div>
-  )
-
-  const form = (
-    <Card padded>
-      <form onSubmit={handled(submit)} style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
-        <div className="fld">
-          <label htmlFor="si-email">Email</label>
-          <input
-            className="inp"
-            id="si-email"
-            type="email"
-            autoComplete="username"
-            required
-            autoFocus
-            placeholder="you@company.com"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value)
-              setError(null)
-            }}
-          />
-        </div>
-        <div className="fld">
-          <label htmlFor="si-password">Password</label>
-          <input
-            className="inp"
-            id="si-password"
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value)
-              setError(null)
-            }}
-          />
-        </div>
-        {error ? (
-          <Banner kind="d" icon="⚠" style={{ margin: 0 }} title="Could not sign you in">
-            {error}
-          </Banner>
-        ) : null}
-        <Btn type="submit" disabled={busy}>
-          {busy ? 'Signing in…' : 'Sign in'}
-        </Btn>
-      </form>
-    </Card>
-  )
-
   if (authState !== 'anonymous') {
     return (
       <div className="authcol">
-        {mark}
+        <div style={{ textAlign: 'center', marginBottom: 26 }}>
+          <Mark height={LOGO_HEIGHT} />
+        </div>
         <Card padded>
           <div style={{ fontSize: 'var(--t-lead)', fontWeight: 600 }}>{me.n}</div>
           <div className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 2 }}>
@@ -178,17 +172,172 @@ export default function SignIn() {
     )
   }
 
+  const toggleNote = (k: keyof typeof NOTES) => setNote((n) => (n === k ? null : k))
+
   return (
-    <div className="authcol">
-      {mark}
-      {form}
-      {DEMO_IDENTITY ? (
-        <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 14, textAlign: 'center' }}>
-          There is no database behind this build yet, so the password is asked for but not checked.{' '}
-          <b className="mono">{ADMIN_EMAIL}</b> signs in as the administrator; any other address
-          signs in as staff.
-        </p>
-      ) : null}
+    <div className="si">
+      <section className="si-hero">
+        <div className="si-hero-in">
+          <Mark height={120} crop={280} />
+          <h1 className="si-title">
+            Trusted Title Solutions
+            <br />
+            for a Smoother Tomorrow
+          </h1>
+          <p className="si-lede">
+            {COMPANY_NAME} provides comprehensive title search and property report services to help
+            you move transactions forward with confidence.
+          </p>
+          <ul className="si-feats">
+            {FEATURES.map(([Glyph, title, detail]) => (
+              <li key={title}>
+                <span className="si-tile">
+                  <Glyph />
+                </span>
+                <span>
+                  <b>{title}</b>
+                  <span>{detail}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="si-scene">
+          <Street />
+          <div className="si-slant" aria-hidden="true" />
+        </div>
+      </section>
+
+      <section className="si-side">
+        <div className="si-card">
+          <div className="si-card-mark">
+            <Mark height={100} crop={240} />
+          </div>
+          <h2 className="si-welcome">Welcome back</h2>
+          <p className="si-sub">Sign in to your {COMPANY_NAME} Portal</p>
+
+          <form onSubmit={handled(submit)} className="si-form">
+            <div className="fld">
+              <label htmlFor="si-email">Work Email</label>
+              <div className="si-inp">
+                <MailIcon />
+                <input
+                  className="inp"
+                  id="si-email"
+                  type="email"
+                  autoComplete="username"
+                  required
+                  autoFocus
+                  placeholder="name@firstkeytitle.com"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setError(null)
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="fld">
+              <label htmlFor="si-password">Password</label>
+              <div className="si-inp">
+                <LockIcon />
+                <input
+                  className="inp"
+                  id="si-password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  required
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    setError(null)
+                  }}
+                />
+                <button
+                  type="button"
+                  className="si-eye"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((v) => !v)}
+                >
+                  <EyeIcon off={showPassword} />
+                </button>
+              </div>
+            </div>
+
+            <div className="si-row">
+              <label className="si-check">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                />
+                Remember me
+              </label>
+              <button
+                type="button"
+                className="si-link"
+                aria-expanded={note === 'forgot'}
+                onClick={() => toggleNote('forgot')}
+              >
+                Forgot password?
+              </button>
+            </div>
+
+            {error ? (
+              <Banner kind="d" icon="⚠" style={{ margin: 0 }} title="Could not sign you in">
+                {error}
+              </Banner>
+            ) : null}
+
+            <button type="submit" className="si-submit" disabled={busy}>
+              {busy ? (
+                'Signing in…'
+              ) : (
+                <>
+                  Sign In
+                  <ArrowIcon />
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="si-or">
+            <span>Or continue with</span>
+          </div>
+
+          <button
+            type="button"
+            className="si-ms"
+            aria-expanded={note === 'microsoft'}
+            onClick={() => toggleNote('microsoft')}
+          >
+            <MicrosoftMark />
+            Sign in with Microsoft
+          </button>
+
+          {note ? (
+            <p className="si-note" role="status">
+              {NOTES[note]}
+            </p>
+          ) : null}
+
+          <p className="si-foot">
+            <LockIcon size={16} />
+            Secure access to your {COMPANY_NAME} workspace.
+          </p>
+        </div>
+
+        {DEMO_IDENTITY ? (
+          <p className="si-demo">
+            There is no database behind this build yet, so the password is asked for but not
+            checked. <b className="mono">{ADMIN_EMAIL}</b> signs in as the administrator; any other
+            address signs in as staff.
+          </p>
+        ) : null}
+      </section>
     </div>
   )
 }
