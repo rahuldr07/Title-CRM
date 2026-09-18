@@ -320,11 +320,6 @@ h1.pg {
   max-width: none;
   padding: 0;
 }
-.authcol {
-  max-width: 400px;
-  margin: 0 auto;
-}
-
 /*
  * The sign-in page: the company's story on the left, the form on the right.
  * design.css has no page like it, so all of this is addition. Its colours are
@@ -332,8 +327,13 @@ h1.pg {
  * dark set below, and the street along the bottom is an SVG that reads them.
  * Text keeps to ink under the no-grey-text rule; the hierarchy is size and
  * weight. Below 980px the story panel goes and the form stands alone.
+ *
+ * .so is the other end of the same visit — the card /signin shows while you
+ * are still signed in, which is where both sign-out controls lead — so it
+ * takes the same tokens, the same street, and the same teal button.
  */
-.si {
+.si,
+.so {
   --si-teal: #136b8a;
   --si-on-teal: #fff;
   --si-navy: #0f2d44;
@@ -353,12 +353,14 @@ h1.pg {
   --si-tree: #86a08a;
   --si-lawn: #93b08a;
   --si-kerb: #c9d1d8;
-
+}
+.si {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   min-height: 100vh;
 }
-body.dark .si {
+body.dark .si,
+body.dark .so {
   --si-teal: #5cb8d6;
   --si-on-teal: #062230;
   --si-navy: var(--ink);
@@ -484,7 +486,8 @@ body.dark .si {
    tint on a light ground; on a dark one it keeps a plate of its own. The blend
    sits on the crop box, not the image inside it — the box's transform makes it
    a stacking context, and an image blending inside one blends with nothing. */
-.si .si-logo {
+.si .si-logo,
+.so .si-logo {
   display: inline-block;
   vertical-align: top;
 }
@@ -694,12 +697,77 @@ body.dark .si-hero-in .si-logo-crop {
   gap: 8px;
   margin: 30px 0 0;
   font-size: var(--t-label);
+  text-align: center;
+}
+.si-foot svg {
+  flex: none;
 }
 .si-demo {
   max-width: 560px;
   margin: 16px 0 0;
   text-align: center;
   font-size: var(--t-small);
+}
+
+.so {
+  max-width: 480px;
+  margin: clamp(8px, 4vh, 40px) auto 0;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--hair);
+  border-radius: 13px;
+  box-shadow: var(--sh1);
+}
+.so-art {
+  position: relative;
+  height: 170px;
+  background: linear-gradient(180deg, var(--si-sky1), var(--si-sky2) 72%);
+  border-bottom: 1px solid var(--hair);
+}
+.so-body {
+  padding: 24px clamp(20px, 5vw, 36px) 28px;
+}
+.so-title {
+  margin: 14px 0 18px;
+  text-align: center;
+  font-size: var(--t-h1);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--si-navy);
+}
+.so-who {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid var(--hair);
+  border-radius: 11px;
+  background: var(--tint);
+}
+.so-who .si-tile {
+  font-size: var(--t-lead);
+  font-weight: 650;
+}
+.so-who b {
+  display: block;
+  font-size: var(--t-lead);
+  color: var(--si-navy);
+}
+.so-who b + span {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--t-small);
+}
+.so-can {
+  margin: 16px 0 20px;
+  font-size: var(--t-small);
+  line-height: 1.55;
+}
+.so .si-submit {
+  width: 100%;
+}
+.so .si-foot {
+  margin-top: 22px;
 }
 
 @media (max-width: 980px) {

@@ -2,11 +2,12 @@ import { useState, type FormEvent } from 'react'
 import { useRouterState } from '@tanstack/react-router'
 import { useGo } from '@/lib/nav'
 import { useQueryClient } from '@tanstack/react-query'
-import { Banner, Btn, Card } from '@/components/ui'
+import { Banner } from '@/components/ui'
 import { useSession } from '@/state/session'
 import { useUi } from '@/state/ui'
 import { STAFF } from '@/data/people'
 import { COMPANY_GLYPH, COMPANY_NAME, LOGO_HEIGHT, LOGO_URL } from '@/data/brand'
+import { initials } from '@/lib/format'
 import { can as capabilityOf, mayVisit, roleName } from '@/lib/permissions'
 import { DEMO_IDENTITY } from '@/lib/demo'
 import { ADMIN_EMAIL, checkCredentials } from '@/lib/credentials'
@@ -91,6 +92,7 @@ export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false)
   const [remember, setRemember] = useState(true)
   const [note, setNote] = useState<keyof typeof NOTES | null>(null)
+  const [leaving, setLeaving] = useState(false)
 
   const landing = (personId: string) => {
     const person = STAFF.find((s) => s.id === personId)
@@ -138,36 +140,67 @@ export default function SignIn() {
     }
   }
 
+  /* Both sign-out controls — the sidebar's ⏻ and the account chip — lead here
+     while you are still signed in, so this card is the sign-out screen, and
+     it wears the sign-in page's street so leaving looks like where you came in. */
   if (authState !== 'anonymous') {
     return (
-      <div className="authcol">
-        <div style={{ textAlign: 'center', marginBottom: 26 }}>
-          <Mark height={LOGO_HEIGHT} />
+      <div className="so">
+        <div className="so-art" aria-hidden="true">
+          <Street />
+          <div className="si-slant" />
         </div>
-        <Card padded>
-          <div style={{ fontSize: 'var(--t-lead)', fontWeight: 600 }}>{me.n}</div>
-          <div className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 2 }}>
-            {roleName(me.r)} · {me.dep.join(', ') || 'No department'}
+        <div className="so-body">
+          <div className="si-card-mark">
+            <Mark height={LOGO_HEIGHT + 28} crop={200} />
           </div>
-          <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 12 }}>
+          <h2 className="so-title">Ready to sign out?</h2>
+          <div className="so-who">
+            <span className="si-tile" aria-hidden="true">
+              {initials(me.n)}
+            </span>
+            <span style={{ minWidth: 0 }}>
+              <b>{me.n}</b>
+              <span>
+                {roleName(me.r)} · {me.dep.join(', ') || 'No department'}
+              </span>
+            </span>
+          </div>
+          <p className="so-can">
             You {can('all') ? 'can' : 'cannot'} see every order, and{' '}
             {can('pricing') ? 'can' : 'cannot'} see pricing and invoices. Your role decides which
             screens exist at all.
           </p>
-          <div style={{ marginTop: 16 }}>
-            <Btn
-              variant="ghost"
-              onClick={handled(async () => {
+          <button
+            type="button"
+            className="si-submit"
+            disabled={leaving}
+            onClick={handled(async () => {
+              setLeaving(true)
+              try {
                 await signOut()
                 setEmail('')
                 setPassword('')
                 navigate({ to: '/signin', replace: true })
-              })}
-            >
-              Sign out
-            </Btn>
-          </div>
-        </Card>
+              } finally {
+                setLeaving(false)
+              }
+            })}
+          >
+            {leaving ? (
+              'Signing out…'
+            ) : (
+              <>
+                Sign out
+                <ArrowIcon />
+              </>
+            )}
+          </button>
+          <p className="si-foot">
+            <LockIcon size={16} />
+            Secure access to your {COMPANY_NAME} workspace.
+          </p>
+        </div>
       </div>
     )
   }
