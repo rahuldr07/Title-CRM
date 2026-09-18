@@ -220,6 +220,7 @@ export function Kpi({
   onClick,
   selected,
   flat,
+  chevron,
 }: {
   title: string
   value: ReactNode
@@ -233,6 +234,11 @@ export function Kpi({
   onClick?: (() => void) | undefined
   selected?: boolean
   flat?: boolean
+  /* The design's own card (`kcard`): the icon sits beside the title and a
+     clickable card carries a › at the right, so which cards open something
+     is visible before the pointer finds it. Opt-in, because the screens not
+     yet checked against the design still expect the icon on the right. */
+  chevron?: boolean
 }) {
   const cls = [
     'kpi',
@@ -263,7 +269,22 @@ export function Kpi({
     <div className={cls} {...interactive}>
       <div className="t">
         {title}
-        {icon ? <span className="i">{icon}</span> : null}
+        {chevron ? (
+          <>
+            {icon ? (
+              <span aria-hidden="true" style={{ opacity: 0.7 }}>
+                {icon}
+              </span>
+            ) : null}
+            {onClick ? (
+              <span className="i" aria-hidden="true">
+                ›
+              </span>
+            ) : null}
+          </>
+        ) : icon ? (
+          <span className="i">{icon}</span>
+        ) : null}
       </div>
       <div
         className={`v${valueTone ? ' ' + valueTone : ''}`}

@@ -1,4 +1,5 @@
 import { ONTIMETARGET } from '@/data/budget'
+import { ASSIGN_STAGES } from '@/data/org'
 import type { Delivery } from '@/data/deliveries'
 import { now } from '@/lib/clock'
 
@@ -23,6 +24,30 @@ export function onTime30(deliveries: Delivery[]): OnTime {
     late: late.length,
     rows: late,
   }
+}
+
+/**
+ * For each late delivery, the stage that took the longest; then how many late
+ * deliveries each stage was the longest on, most first. It is what the
+ * Dashboard's on-time card opens — if one stage dominates, that is a budget or
+ * staffing problem rather than a person problem. A delivery with no stage
+ * hours recorded names no stage rather than a made-up one.
+ */
+export function whereTheTimeWent(late: Delivery[]): [stage: string, count: number][] {
+  const by: Record<string, number> = {}
+  for (const d of late) {
+    let worst: string | null = null
+    let most = 0
+    for (const s of ASSIGN_STAGES) {
+      const h = d.st[s] ?? 0
+      if (h > most) {
+        most = h
+        worst = s
+      }
+    }
+    if (worst) by[worst] = (by[worst] ?? 0) + 1
+  }
+  return Object.entries(by).sort((a, b) => b[1] - a[1])
 }
 
 export function median(xs: number[]): number {

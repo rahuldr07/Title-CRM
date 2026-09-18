@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useGo } from '@/lib/nav'
-import { Btn, Chip, Due, Empty, Kpi, Kpis, PageHead, SectionHead } from '@/components/ui'
+import { Btn, Chip, Due, Empty, Kpi, Kpis, PageHead, Row, Rows, SectionHead } from '@/components/ui'
 import { RequireCap } from '@/components/RequireCap'
 import { useSession } from '@/state/session'
+import { useUi } from '@/state/ui'
 import { ORDERS } from '@/data/production'
 import { STAGES, STATUS } from '@/data/org'
 import { TZ, fmtDate, orderChipKind } from '@/lib/format'
 import { now } from '@/lib/clock'
 import { atRiskCount, openCount, pastDue } from '@/lib/derived'
 import { board, curStage, stageCounts } from '@/lib/engine'
-import { ONTIMETARGET, onTime30 } from '@/lib/metrics'
+import { ONTIMETARGET, onTime30, whereTheTimeWent, type OnTime } from '@/lib/metrics'
 import { useDeliveries } from '@/lib/useDeliveries'
 import { celebrationsWithin } from '@/lib/celebrations'
 import { STAFF } from '@/data/people'
@@ -20,9 +21,78 @@ const st = (k: string) => STATUS[k]?.[0] ?? k
 const stColor = (k: string) => STATUS[k]?.[1] ?? '#94A3B8'
 
 const COLS = '40px 130px 110px 1.4fr 150px 190px 130px'
+/* The fixed columns, six 13px gaps and the row padding come to 864px, so the
+   design's 900px floor left the address column 36px once the # column was
+   added — an address broke one letter to a line and every row went tall below
+   ~1100px. 975 gives it 110px, and still fits a 1280px laptop without scroll. */
+const MIN_W = 975
+
+/* The Today cards' "· click to see", as the design prints it on every card
+   that opens a report. */
+const clickToSee = <span style={{ fontSize: 'var(--t-micro)' }}> · click to see</span>
+
+/* What the on-time card opens: the figure taken apart, then the stage that ran
+   longest on each late delivery. The design's own onTimeDetail, including its
+   way on to the Turnaround report. */
+function onTimeBody(ot: OnTime) {
+  if (ot.pct === null) {
+    return (
+      <p className="gr" style={{ fontSize: 'var(--t-body)', margin: 0 }}>
+        Nothing has been delivered in the last thirty days, so there is no percentage to state.
+      </p>
+    )
+  }
+  const ranked = whereTheTimeWent(ot.rows)
+  const gap = ot.pct - ONTIMETARGET
+  return (
+    <>
+      <Rows>
+        <Row
+          title="Delivered inside the promise"
+          detail="over the last thirty days"
+          right={<span className="mono ok">{ot.total - ot.late}</span>}
+        />
+        <Row
+          title="Delivered late"
+          detail="the client was owed an explanation for each"
+          right={<span className={`mono ${ot.late ? 'bad' : 'ok'}`}>{ot.late}</span>}
+        />
+        <Row
+          title="Against a target of"
+          detail={`${ONTIMETARGET}%`}
+          right={<span className={`mono ${gap < 0 ? 'bad' : 'ok'}`}>{gap.toFixed(1)} pts</span>}
+        />
+      </Rows>
+      {ranked.length ? (
+        <>
+          <SectionHead>Where the time went</SectionHead>
+          <Rows>
+            {ranked.map(([stage, n]) => (
+              <Row
+                key={stage}
+                title={stage}
+                detail="the stage that took longest on a late order"
+                right={
+                  <span className={`mono ${n > ot.late / 3 ? 'bad' : 'gr'}`}>
+                    {n} order{n === 1 ? '' : 's'}
+                  </span>
+                }
+              />
+            ))}
+          </Rows>
+        </>
+      ) : null}
+      <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 12 }}>
+        The percentage is worked out from the deliveries themselves, not stored. If one stage
+        dominates the list above, that is a budget or staffing problem rather than a person problem.
+      </p>
+    </>
+  )
+}
 
 function Dashboard() {
   const { tenant } = useSession()
+  const { openModal, closeModal } = useUi()
   const navigate = useGo()
   const [pipe, setPipe] = useState<string | null>(null)
 
@@ -40,6 +110,33 @@ function Dashboard() {
 
   const unassigned = ORDERS.filter((o) => !o.done && Object.values(o.a).every((x) => !x)).length
   const { run: RUN } = board()
+  const openOnTime = () =>
+    openModal({
+      title:
+        ot.pct === null
+          ? 'On-time delivery'
+          : `On time — ${ot.pct.toFixed(1)}% of ${ot.total} deliveries`,
+      body: onTimeBody(ot),
+      footer: (
+        <>
+          {ot.pct === null ? null : (
+            <Btn
+              variant="ghost"
+              onClick={() => {
+                closeModal()
+                navigate({ to: '/reports', search: { tab: 'Turnaround' } })
+              }}
+            >
+              Turnaround report
+            </Btn>
+          )}
+          <Btn onClick={closeModal}>Close</Btn>
+        </>
+      ),
+    })
+
+  const openRow = (id: string) => navigate({ to: '/orders/$orderId', params: { orderId: id } })
+
   const delivered = RUN.today.filter((o) => !curStage(o)).length
   const moving = RUN.today.filter((o) => curStage(o)).length
   const unplaced = RUN.exc.filter((e) => e.today).length
@@ -65,11 +162,10 @@ function Dashboard() {
           icon="▲"
           value={overdue.length}
           tone={overdue.length ? 'alert' : undefined}
-          detail={
-            <span className={overdue.length ? 'bad' : 'ok'}>
-              {overdue.length ? 'client already owed an explanation' : 'nothing overdue'}
-            </span>
-          }
+          detail={overdue.length ? 'client already owed an explanation' : 'nothing overdue'}
+          detailTone={overdue.length ? 'bad' : 'ok'}
+          chevron
+          hint="The orders that are already late"
           onClick={() => navigate({ to: '/orders', search: { pill: 'late' } })}
         />
         <Kpi
@@ -77,7 +173,10 @@ function Dashboard() {
           icon="◷"
           value={atRisk}
           tone={atRisk ? 'warn' : undefined}
-          detail={<span className="warn">act now to stay on time</span>}
+          detail="act now to stay on time"
+          detailTone="warn"
+          chevron
+          hint="The orders with less than four hours left"
           onClick={() => navigate({ to: '/orders', search: { pill: 'soon' } })}
         />
         <Kpi
@@ -85,6 +184,8 @@ function Dashboard() {
           icon="☰"
           value={open}
           detail={`across ${STAGES.length} stages`}
+          chevron
+          hint="Everything still moving"
           onClick={() => navigate({ to: '/orders', search: { pill: 'all' } })}
         />
         <Kpi
@@ -92,6 +193,8 @@ function Dashboard() {
           icon="⇄"
           value={unassigned}
           detail="nobody picked them up"
+          chevron
+          hint="Where the engine could not place them"
           onClick={() => navigate({ to: '/assign' })}
         />
         <Kpi
@@ -99,12 +202,11 @@ function Dashboard() {
           icon="✓"
           value={otLoading ? <SkeletonValue /> : ot.pct === null ? '—' : ot.pct.toFixed(1) + '%'}
           tone={!otLoading && ot.pct !== null && ot.pct < ONTIMETARGET ? 'warn' : undefined}
-          detail={
-            <span className={ot.pct !== null && ot.pct < ONTIMETARGET ? 'warn' : 'ok'}>
-              target {ONTIMETARGET}%
-            </span>
-          }
-          onClick={() => navigate({ to: '/reports' })}
+          detail={`target ${ONTIMETARGET}%`}
+          detailTone={ot.pct !== null && ot.pct < ONTIMETARGET ? 'warn' : 'ok'}
+          chevron
+          hint="What was late, and where it went over"
+          onClick={otLoading ? undefined : openOnTime}
         />
       </Kpis>
 
@@ -137,7 +239,7 @@ function Dashboard() {
       {shown.length ? (
         <div className="tbl">
           <div className="tsc">
-            <div style={{ minWidth: 900 }}>
+            <div style={{ minWidth: MIN_W }}>
               <div className="trow h" style={{ gridTemplateColumns: COLS }}>
                 <span>#</span>
                 <span>Order</span>
@@ -155,10 +257,12 @@ function Dashboard() {
                     style={{ gridTemplateColumns: COLS }}
                     role="button"
                     tabIndex={0}
-                    onClick={() => navigate({ to: '/orders/$orderId', params: { orderId: o.id } })}
+                    onClick={() => openRow(o.id)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter')
-                        navigate({ to: '/orders/$orderId', params: { orderId: o.id } })
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        openRow(o.id)
+                      }
                     }}
                   >
                     <div className="cell">
@@ -199,7 +303,9 @@ function Dashboard() {
         </div>
       ) : (
         <div className="tbl">
-          <Empty icon="✓">Nothing past due. The board is clean.</Empty>
+          <Empty icon="✓">
+            {pipe ? `Nothing in ${st(pipe)} right now.` : 'Nothing past due. The board is clean.'}
+          </Empty>
         </div>
       )}
 
@@ -215,28 +321,38 @@ function Dashboard() {
         <Kpi
           title="Received"
           value={RUN.today.length}
-          detail={`${fmtDate(now())} · every client`}
-          onClick={() => navigate({ to: '/reports' })}
+          detail={
+            <>
+              {fmtDate(now())} · every client{clickToSee}
+            </>
+          }
+          hint="Open the detail"
+          onClick={() => navigate({ to: '/reports', search: { tab: 'Received' } })}
         />
         <Kpi
           title="Delivered"
           value={<span className="ok">{delivered}</span>}
-          detail="through every department"
-          onClick={() => navigate({ to: '/reports' })}
+          detail={<>through every department{clickToSee}</>}
+          hint="Open the detail"
+          onClick={() => navigate({ to: '/reports', search: { tab: 'Received', focus: 'done' } })}
         />
         <Kpi
           title="Still moving"
           value={<span className="warn">{moving}</span>}
           tone="warn"
-          detail="somewhere in the pipeline"
-          onClick={() => navigate({ to: '/reports' })}
+          detail={<>somewhere in the pipeline{clickToSee}</>}
+          hint="Open the detail"
+          onClick={() => navigate({ to: '/reports', search: { tab: 'Received', focus: 'wip' } })}
         />
         <Kpi
           title="Could not be placed"
           value={<span className={unplaced ? 'bad' : 'ok'}>{unplaced}</span>}
           tone={unplaced ? 'alert' : undefined}
-          detail="waiting on a person"
-          onClick={() => navigate({ to: '/assign' })}
+          detail={<>waiting on a person{clickToSee}</>}
+          hint="Open the detail"
+          onClick={() =>
+            navigate({ to: '/reports', search: { tab: 'By department', focus: 'exc' } })
+          }
         />
       </Kpis>
     </>

@@ -13,12 +13,22 @@ import { capacityTone } from '@/lib/metrics'
 
 const PEOPLE_COLS = '190px 1fr 85px 85px 130px'
 
-export function ByDepartment({ initial, onOpenStaff }: { initial?: string | undefined; onOpenStaff: (id: string) => void }) {
+const FOCI = ['all', 'done', 'pend', 'exc']
+
+export function ByDepartment({
+  initial,
+  initialFocus,
+  onOpenStaff,
+}: {
+  initial?: string | undefined
+  initialFocus?: string | undefined
+  onOpenStaff: (id: string) => void
+}) {
   const { run, depts, dwork } = board()
   useReportExport(() => workloadCsv(depts, true))
   const navigate = useGo()
   const [sel, setSel] = useState(initial ?? 'all')
-  const [focus, setFocus] = useState('all')
+  const [focus, setFocus] = useState(initialFocus && FOCI.includes(initialFocus) ? initialFocus : 'all')
   const { filter, setFilter, query, setQuery, match } = useWorkFilter()
 
   const picker = (

@@ -122,15 +122,19 @@ const routeTree = rootRoute.addChildren([
   /* Insight */
   /* Orders hands the workload report the staff member or department it is
      filtered to, so "Workload report" lands on the answer rather than on the
-     whole floor. All three are optional — /reports on its own still opens on
-     Received. */
+     whole floor; the Dashboard's Today cards name the view inside a tab
+     (`focus`), so "Delivered" opens the delivered orders rather than all of
+     them. All four are optional — /reports on its own still opens on Received. */
   createRoute({
     getParentRoute: () => rootRoute,
     path: '/reports',
-    validateSearch: (s: Record<string, unknown>): { tab?: string; sw?: string; dw?: string } => ({
+    validateSearch: (
+      s: Record<string, unknown>,
+    ): { tab?: string; sw?: string; dw?: string; focus?: string } => ({
       ...(typeof s.tab === 'string' ? { tab: s.tab } : {}),
       ...(typeof s.sw === 'string' ? { sw: s.sw } : {}),
       ...(typeof s.dw === 'string' ? { dw: s.dw } : {}),
+      ...(typeof s.focus === 'string' ? { focus: s.focus } : {}),
     }),
     component: lazyRouteComponent(() => import('./screens/Reports')),
   }),

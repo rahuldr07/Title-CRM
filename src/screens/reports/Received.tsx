@@ -15,11 +15,13 @@ import { useReportExport } from '@/state/reportExport'
 
 const val = (n: number) => (n ? <b className="mono">{n}</b> : <span className="gr">—</span>)
 
-export function Received() {
+const FOCI = ['all', 'done', 'wip', 'clients']
+
+export function Received({ initialFocus }: { initialFocus?: string | undefined } = {}) {
   const navigate = useGo()
   const { run } = board()
   const [day, setDay] = useState(() => fmtDate(now()))
-  const [focus, setFocus] = useState('all')
+  const [focus, setFocus] = useState(initialFocus && FOCI.includes(initialFocus) ? initialFocus : 'all')
 
   const os = day === 'all' ? run.orders : run.orders.filter((o) => o.dk === day)
   useReportExport(() => receivedCsv(os))

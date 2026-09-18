@@ -19,7 +19,7 @@ const TABS = ['Received', 'Assigned', 'Turnaround', 'By staff', 'By department',
 type Tab = (typeof TABS)[number]
 
 function Reports() {
-  const { tab: tabParam, sw, dw } = useSearch({ from: '/reports' })
+  const { tab: tabParam, sw, dw, focus } = useSearch({ from: '/reports' })
   const isTab = (t?: string): t is Tab => !!t && (TABS as readonly string[]).includes(t)
 
   const [tab, setTab] = useState<Tab>(isTab(tabParam) ? tabParam : 'Received')
@@ -88,13 +88,18 @@ function Reports() {
 
       <Tabs tabs={[...TABS]} value={tab} onChange={pickTab} />
 
-      {tab === 'Received' ? <Received /> : null}
+      {tab === 'Received' ? <Received initialFocus={tabParam === 'Received' ? focus : undefined} /> : null}
       {tab === 'Assigned' ? <Assigned onOpenStaff={() => pickTab('By staff')} /> : null}
       {tab === 'By staff' ? (
         <ByStaff key={person ?? 'all'} initial={person} onOpenDept={openDept} />
       ) : null}
       {tab === 'By department' ? (
-        <ByDepartment key={dept ?? 'all'} initial={dept} onOpenStaff={openStaff} />
+        <ByDepartment
+          key={dept ?? 'all'}
+          initial={dept}
+          initialFocus={tabParam === 'By department' ? focus : undefined}
+          onOpenStaff={openStaff}
+        />
       ) : null}
 
       {tab === 'Turnaround' ? (

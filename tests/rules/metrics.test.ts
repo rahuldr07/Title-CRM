@@ -5,6 +5,7 @@ import {
   capacityTone,
   median,
   onTime30,
+  whereTheTimeWent,
   type Delivery,
 } from '@/lib/metrics'
 import { SEED_NOW, resetClock, setClock } from '@/lib/clock'
@@ -34,6 +35,27 @@ const delivery = (daysAgo: number, late: boolean, id = `ORD-${daysAgo}`): Delive
   byName: {},
   hrs: 12,
   late,
+})
+
+describe('where the time went on late deliveries', () => {
+  const late = (st: Record<string, number>): Delivery => ({ ...delivery(1, true), st })
+
+  it('charges each late delivery to its longest stage, most first', () => {
+    expect(
+      whereTheTimeWent([
+        late({ Search: 9, Typing: 3 }),
+        late({ Search: 2, Typing: 7 }),
+        late({ Search: 8, 'Search QC': 1 }),
+      ]),
+    ).toEqual([
+      ['Search', 2],
+      ['Typing', 1],
+    ])
+  })
+
+  it('names no stage for a delivery with no stage hours', () => {
+    expect(whereTheTimeWent([late({})])).toEqual([])
+  })
 })
 
 describe('on-time over thirty days', () => {
