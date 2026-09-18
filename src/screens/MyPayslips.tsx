@@ -52,16 +52,18 @@ export default function MyPayslips() {
             title="Last net pay"
             value={inr(latest.net)}
             valueTone="ok"
-            valueSize={23}
+            valueSize="var(--t-h1)"
             detail={newest}
+            chevron
             hint="Open that payslip"
             onClick={() => openPayslip(newest)}
           />
           <Kpi
             title="Gross that month"
             value={inr(latest.gross)}
-            valueSize={23}
+            valueSize="var(--t-h1)"
             detail="before deductions"
+            chevron
             hint="Open that payslip"
             onClick={() => openPayslip(newest)}
           />
@@ -69,14 +71,16 @@ export default function MyPayslips() {
             title="Deducted this year"
             value={inr(year.ded)}
             valueTone="warn"
-            valueSize={23}
+            valueSize="var(--t-h1)"
             detail={`of which ${inr(year.tds)} tax`}
+            flat
           />
           <Kpi
             title="Received this year"
             value={inr(year.net)}
-            valueSize={23}
+            valueSize="var(--t-h1)"
             detail={`across ${published.length} month${published.length === 1 ? '' : 's'}`}
+            chevron
             hint="Month by month"
             onClick={() => focusSection('mpList')}
           />
@@ -110,7 +114,7 @@ export default function MyPayslips() {
                       style={{ gridTemplateColumns: COLS, cursor: 'pointer' }}
                       onClick={() => openPayslip(m)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
+                        if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault()
                           openPayslip(m)
                         }

@@ -225,7 +225,9 @@ export function Kpi({
   title: string
   value: ReactNode
   valueTone?: 'ok' | 'warn' | 'bad' | undefined
-  valueSize?: number
+  /* A step of the type scale (`'var(--t-h1)'`) rather than px; a number is
+     still accepted for the screens not yet moved off one. */
+  valueSize?: number | string
   detail?: ReactNode
   detailTone?: 'ok' | 'warn' | 'bad'
   tone?: 'alert' | 'warn' | undefined

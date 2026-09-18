@@ -48,7 +48,16 @@ export default function PayslipDetail() {
   if (!person) {
     return (
       <>
-        <PageHead parent={{ to: '/payslips', label: 'Payslips' }} title="No such person" />
+        {/* The register needs pricing; anyone without it came from My payslips,
+            and "← Payslips" would take them to a page they cannot open. */}
+        <PageHead
+          parent={
+            can('pricing')
+              ? { to: '/payslips', label: 'Payslips' }
+              : { to: '/mypay', label: 'My payslips' }
+          }
+          title="No such person"
+        />
         <Card padded style={{ maxWidth: 560 }}>
           <p style={{ fontSize: 'var(--t-body)', margin: 0 }}>
             Nobody on the roster has that reference.
