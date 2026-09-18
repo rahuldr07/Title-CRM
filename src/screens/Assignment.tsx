@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useSearch } from '@tanstack/react-router'
 import { Btn, PageHead, Tabs } from '@/components/ui'
+import { useGo } from '@/lib/nav'
 import { RequireCap } from '@/components/RequireCap'
 import { useUi } from '@/state/ui'
 import { useLevels } from '@/state/levels'
@@ -12,8 +13,15 @@ import { LevelsTab } from './assignment/LevelsTab'
 
 export type AssignTab = 'Live' | 'Exceptions' | 'Capacity' | 'Rules' | 'Levels'
 
+const TABS: AssignTab[] = ['Live', 'Exceptions', 'Capacity', 'Rules', 'Levels']
+const isTab = (t?: string): t is AssignTab => !!t && (TABS as string[]).includes(t)
+
 function Assignment() {
-  const [tab, setTab] = useState<AssignTab>('Live')
+  const { tab: tabParam } = useSearch({ from: '/assign' })
+  const navigate = useGo()
+  const tab: AssignTab = isTab(tabParam) ? tabParam : 'Live'
+  const setTab = (t: AssignTab) =>
+    navigate({ to: '/assign', search: t === 'Live' ? {} : { tab: t }, replace: true })
   const { toast } = useUi()
   const { coverageGaps } = useLevels()
   const { board, rules, rerun } = useRules()

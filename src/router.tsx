@@ -61,7 +61,15 @@ const routeTree = rootRoute.addChildren([
   screen('/mywork', () => import('./screens/MyWork')),
   screen('/mypay', () => import('./screens/MyPayslips')),
   screen('/myperf', () => import('./screens/MyPerformance')),
-  screen('/assign', () => import('./screens/Assignment')),
+  /* The tab rides in the URL, so coming back from a person or an order opened
+     on Levels or Exceptions lands on that tab rather than on Live. */
+  createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/assign',
+    validateSearch: (s: Record<string, unknown>): { tab?: string } =>
+      typeof s.tab === 'string' ? { tab: s.tab } : {},
+    component: lazyRouteComponent(() => import('./screens/Assignment')),
+  }),
   screen('/intake', () => import('./screens/Intake')),
   screen('/commitment', () => import('./screens/CommitmentReport')),
 

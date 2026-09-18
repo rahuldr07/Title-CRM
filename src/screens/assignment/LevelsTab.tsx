@@ -291,9 +291,16 @@ export function LevelsTab() {
             .join(' · ')}
           actions={
             <>
-              {gaps.length ? (
+              {/* It always opened the county list, so a gap that was only a
+                  product opened "Every county is covered" — true, and not the gap. */}
+              {gaps.some((g) => g.kind === 'place') ? (
                 <Btn variant="ghost" small onClick={() => showGaps('place')}>
-                  The gaps
+                  {gaps.some((g) => g.kind !== 'place') ? 'County gaps' : 'The gaps'}
+                </Btn>
+              ) : null}
+              {gaps.some((g) => g.kind !== 'place') ? (
+                <Btn variant="ghost" small onClick={() => showGaps('product')}>
+                  {gaps.some((g) => g.kind === 'place') ? 'Product gaps' : 'The gaps'}
                 </Btn>
               ) : null}
               {moves.length ? (

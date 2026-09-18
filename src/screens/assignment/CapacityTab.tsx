@@ -1,4 +1,6 @@
 import { useGo } from '@/lib/nav'
+import { useSession } from '@/state/session'
+import { routeNeeds } from '@/lib/permissions'
 import { BarRow, Btn, Card, Chip, Label } from '@/components/ui'
 import { AVAIL, STAFF } from '@/data/people'
 import { CAPACITY_AMBER, CAPACITY_RED, capacityTone } from '@/lib/metrics'
@@ -6,6 +8,9 @@ import type { AssignmentBoard } from '@/lib/engine'
 
 export function CapacityTab({ board }: { board: AssignmentBoard }) {
   const navigate = useGo()
+  const { can } = useSession()
+  const companyNeeds = routeNeeds('company')
+  const mayEditStaff = !companyNeeds || can(companyNeeds)
   const { run } = board
   const load = run.load
   const plan = run.assigns.filter((a) => a.today)
@@ -141,26 +146,31 @@ export function CapacityTab({ board }: { board: AssignmentBoard }) {
       <Card style={{ marginTop: 18 }}>
         <div className="ch">
           <h2>Availability today</h2>
-          <div className="r">
-            <Btn
-              variant="ghost"
-              small
-              onClick={() => navigate({ to: '/company', search: { tab: 'Staff' } })}
-            >
-              Edit staff
-            </Btn>
-          </div>
+          {/* A lead can run assignment but cannot open Company, where this led. */}
+          {mayEditStaff ? (
+            <div className="r">
+              <Btn
+                variant="ghost"
+                small
+                onClick={() => navigate({ to: '/company', search: { tab: 'Staff' } })}
+              >
+                Edit staff
+              </Btn>
+            </div>
+          ) : null}
         </div>
         <div className="tsc">
           <table className="mat">
             <thead>
               <tr>
-                <th>Staff</th>
-                <th>Departments</th>
+                {/* A <th> centres by default and these columns are left-aligned
+                    text, so each heading sat off its own column. */}
+                <th style={{ textAlign: 'left' }}>Staff</th>
+                <th style={{ textAlign: 'left' }}>Departments</th>
                 <th style={{ textAlign: 'right' }}>Target</th>
                 <th style={{ textAlign: 'right' }}>Load</th>
                 <th style={{ textAlign: 'right' }}>Room</th>
-                <th>Status</th>
+                <th style={{ textAlign: 'left' }}>Status</th>
               </tr>
             </thead>
             <tbody>

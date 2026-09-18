@@ -196,6 +196,10 @@ export function LiveTab({
 
       <SectionHead id={ARRIVALS}>Arrivals by hour — click to filter</SectionHead>
       <Card padded>
+        {/* Nine bars cannot shrink past their hour labels, so on a phone they ran
+            past the card and took the whole page into sideways scroll. They
+            scroll inside the card instead, as the tables do. */}
+        <div style={{ overflowX: 'auto' }}>
         <div className="hbars">
           {run.hourly.map((h) => {
             const on = hour === h.hr
@@ -223,6 +227,7 @@ export function LiveTab({
               </button>
             )
           })}
+        </div>
         </div>
       </Card>
 
@@ -253,7 +258,10 @@ export function LiveTab({
                   tabIndex={0}
                   onClick={() => showTrace(o)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') showTrace(o)
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      showTrace(o)
+                    }
                   }}
                 >
                   <div className="cell">

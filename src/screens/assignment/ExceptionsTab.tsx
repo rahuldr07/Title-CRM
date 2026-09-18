@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useGo } from '@/lib/nav'
 import { Btn, Card, Chip, Empty } from '@/components/ui'
 import { useUi } from '@/state/ui'
+import { useSession } from '@/state/session'
 import { AVAIL, STAFF } from '@/data/people'
 import { ASSIGN_STAGES, PAIRS } from '@/data/org'
 import { COVSTAGES } from '@/lib/qualification'
-import { whoName } from '@/lib/permissions'
+import { routeNeeds, whoName } from '@/lib/permissions'
 import { covOK } from '@/lib/ruleText'
 import { EXCLUSION, type AssignmentBoard, type Exception, type ExclusionReason } from '@/lib/engine'
 
@@ -32,6 +33,9 @@ export function ExceptionsTab({
   onTab: (t: 'Rules') => void
 }) {
   const navigate = useGo()
+  const { can } = useSession()
+  const companyNeeds = routeNeeds('company')
+  const mayOpenCompany = !companyNeeds || can(companyNeeds)
   const { toast, openModal, closeModal } = useUi()
   const [placed, setPlaced] = useState<Record<string, string>>({})
 
@@ -114,15 +118,18 @@ export function ExceptionsTab({
             Any order that needs it today has nowhere to go.
             <div className="bs">This is why a department with one member is worth watching.</div>
           </div>
-          <div className="ba">
-            <Btn
-              variant="ghost"
-              small
-              onClick={() => navigate({ to: '/company', search: { tab: 'Departments' } })}
-            >
-              See departments
-            </Btn>
-          </div>
+          {/* A lead can run assignment but cannot open Company, where this led. */}
+          {mayOpenCompany ? (
+            <div className="ba">
+              <Btn
+                variant="ghost"
+                small
+                onClick={() => navigate({ to: '/company', search: { tab: 'Departments' } })}
+              >
+                See departments
+              </Btn>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

@@ -29,13 +29,15 @@ const draftOf = (r: Rule): RuleDraft => ({
 })
 
 export function RulesTab({ board, onTab }: { board: AssignmentBoard; onTab: (t: 'Levels') => void }) {
-  const { openModal, closeModal, toast } = useUi()
+  const { modal, openModal, closeModal, toast } = useUi()
   const { rules, engine, setEngine, toggle, save, remove, dryRun } = useRules()
   const { run } = board
 
   const [editing, setEditing] = useState<{ id: string | null } | null>(null)
   const [draft, setDraft] = useState<RuleDraft>(blankDraft)
   const [problem, setProblem] = useState<string | null>(null)
+  /* Bumped to put the editor back up after a dry run taken from it. */
+  const [reshow, setReshow] = useState(0)
 
   const on = rules.filter((r) => r.on).length
 
@@ -77,7 +79,23 @@ export function RulesTab({ board, onTab }: { board: AssignmentBoard; onTab: (t: 
             </p>
           </>
         ),
-        footer: <Btn onClick={closeModal}>Close</Btn>,
+        footer: d ? (
+          <>
+            <Btn variant="ghost" onClick={() => setReshow((n) => n + 1)}>
+              Back to the rule
+            </Btn>
+            <Btn
+              onClick={() => {
+                setEditing(null)
+                closeModal()
+              }}
+            >
+              Close
+            </Btn>
+          </>
+        ) : (
+          <Btn onClick={closeModal}>Close</Btn>
+        ),
       })
     },
     [dryRun, openModal, closeModal, run],
@@ -350,7 +368,19 @@ export function RulesTab({ board, onTab }: { board: AssignmentBoard; onTab: (t: 
         </>
       ),
     })
-  }, [editing, draft, problem, rules, run, openModal])
+  }, [editing, draft, problem, rules, run, openModal, reshow])
+
+  /* Closing the editor any other way than Cancel or Save — Esc, ×, a click
+     outside, or Close on its dry run — used to leave the rule marked as being
+     edited, so the next toggle of any rule, or any change to the run, put the
+     stale editor back up on its own. Its going away now ends the edit. */
+  const [seen, setSeen] = useState(modal)
+  if (seen !== modal) {
+    setSeen(modal)
+    /* While a rule is being edited the only modals that can be up are its
+       editor and its dry run, so one closing means the edit was dismissed. */
+    if (seen !== null && modal === null && editing) setEditing(null)
+  }
 
   return (
     <>
