@@ -6,8 +6,11 @@ import tseslint from 'typescript-eslint'
 export default tseslint.config(
   /* All output, none of it source: `dist` and `drizzle` are built, `.vercel`
      holds the deployed bundles, and `coverage` and `shots` are what a test or
-     screenshot run leaves behind. */
-  { ignores: ['dist', 'drizzle', '.vercel', 'coverage', 'shots'] },
+     screenshot run leaves behind. `.claude` holds other checkouts of this
+     repository (git worktrees, with their own `dist`), which `.gitignore`
+     already skips but flat config does not read — linting them took `npm run
+     lint` from seconds to never finishing. */
+  { ignores: ['dist', 'drizzle', '.vercel', 'coverage', 'shots', '.claude'] },
   /* Seed data, not logic. The bulk of it is transcribed from the design export
      by script, which is why `.gitattributes` marks those files
      linguist-generated; the rest are hand-written fixtures in the same shape.
