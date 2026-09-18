@@ -47,7 +47,14 @@ import { fmtDT, fmtDate, parseUsDate } from '@/lib/format'
 import { now } from '@/lib/clock'
 import type { Update } from '@/data/types'
 
-const QCOLS = '40px 150px 150px 140px 1fr 150px 110px'
+/* Client holds a short code over a product code, so 120px is plenty; the
+   30px it gives up lets "by 08/04/2026 3:48 AM" sit on one line in Your stage
+   instead of three at this type size. The fixed columns, gaps and row padding
+   come to 854px, so the design's 880px floor left the property column 26px
+   once the # column was added — a letter a line below ~1100px wide. 964 keeps
+   it 110px and still fits a 1280px laptop without scroll. */
+const QCOLS = '40px 150px 120px 170px 1fr 150px 110px'
+const QMIN = 964
 
 const greeting = (h: number) => (h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening')
 
@@ -416,6 +423,7 @@ export default function MyWork() {
           value={<span className={open.length ? 'warn' : 'ok'}>{open.length}</span>}
           tone={open.length ? 'warn' : undefined}
           detail={open.length ? 'still to finish' : 'nothing outstanding'}
+          chevron
           hint="Your queue"
           onClick={() => focusSection('mwQueue')}
         />
@@ -423,6 +431,7 @@ export default function MyWork() {
           title="Finished today"
           value={<span className="ok">{wk.done}</span>}
           detail={`${wk.pct}% of what you were given`}
+          chevron
           hint="What you finished"
           onClick={myDone}
         />
@@ -431,6 +440,7 @@ export default function MyWork() {
           value={<span className={risky.length ? 'bad' : 'ok'}>{risky.length}</span>}
           tone={risky.length ? 'alert' : undefined}
           detail="past an internal checkpoint"
+          chevron
           hint="Which ones, and by how much"
           onClick={myLate}
         />
@@ -438,6 +448,7 @@ export default function MyWork() {
           title="Room left today"
           value={roomLeft}
           detail={`of a ${me.cap} target`}
+          chevron
           hint="How the target is set"
           onClick={myCapacity}
         />
@@ -568,7 +579,7 @@ export default function MyWork() {
         <>
           <Card>
             <div className="tsc">
-              <div style={{ minWidth: 880 }}>
+              <div style={{ minWidth: QMIN }}>
                 <div className="trow h" style={{ gridTemplateColumns: QCOLS }}>
                   <span>#</span>
                   <span>Order</span>
@@ -593,7 +604,7 @@ export default function MyWork() {
                         style={{ gridTemplateColumns: QCOLS, cursor: 'pointer' }}
                         onClick={openOrder}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
+                          if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault()
                             openOrder()
                           }

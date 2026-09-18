@@ -38,7 +38,7 @@ import { median } from '@/lib/metrics'
 import { standing, type StageWork } from '@/lib/quality'
 import { DEFAULT_RANGE, inRange, resolveRange } from '@/lib/range'
 import { fmtDate, initials } from '@/lib/format'
-import { roleName } from '@/lib/permissions'
+import { roleName, routeNeeds } from '@/lib/permissions'
 import { useDeliveries } from '@/lib/useDeliveries'
 import { useQcLog } from '@/lib/useQcLog'
 import { useStageWork } from '@/lib/useStageWork'
@@ -998,10 +998,22 @@ export default function PersonDetail() {
     </>
   )
 
+  /* "← Staff" opens the Company roster, which staff cannot open — so from My
+     profile, or a colleague reached from My work, it led to "You do not have
+     access". Anyone who cannot see the roster goes back home instead, the same
+     place the top bar's back button takes them. */
+  const rosterNeeds = routeNeeds('company')
+  const parent =
+    !rosterNeeds || can(rosterNeeds)
+      ? { to: '/company', search: { tab: 'Staff' }, label: 'Staff' }
+      : can('all')
+        ? { to: '/dash', label: 'Dashboard' }
+        : { to: '/mywork', label: 'My work' }
+
   return (
     <>
       <PageHead
-        parent={{ to: '/company', search: { tab: 'Staff' }, label: 'Staff' }}
+        parent={parent}
         title={person.n}
         sub={`${person.dep.join(', ') || 'no department'} · ${roleName(person.r)}`}
         actions={
