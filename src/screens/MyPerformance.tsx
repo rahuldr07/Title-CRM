@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useGo } from '@/lib/nav'
 import {
   Banner,
@@ -15,7 +15,7 @@ import {
   focusSection,
 } from '@/components/ui'
 import { RangeBar } from '@/components/RangeBar'
-import { SkeletonRows } from '@/components/async'
+import { SkeletonRows, SkeletonValue } from '@/components/async'
 import { useBudgetHelp } from '@/components/budgetHelp'
 import { useSession } from '@/state/session'
 import { useUi } from '@/state/ui'
@@ -48,6 +48,103 @@ interface WeekPoint {
 }
 
 const MAX_WEEKS = 12
+
+const CHART_H = 178
+
+/**
+ * The weekly line, drawn at the width it is actually given.
+ *
+ * It used to be a fixed 610-wide drawing stretched to the card with
+ * preserveAspectRatio="none", so on any real screen its labels were pulled
+ * sideways and its points became ovals. Measuring the box and drawing in its
+ * own pixels keeps the text upright and the points round at every width, and
+ * thins the week labels out when there is no room for all of them.
+ */
+function WeeklyChart({ weeks }: { weeks: WeekPoint[] }) {
+  const box = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(610)
+
+  useEffect(() => {
+    const el = box.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const watch = new ResizeObserver(([entry]) => {
+      if (entry) setWidth(Math.max(260, Math.round(entry.contentRect.width)))
+    })
+    watch.observe(el)
+    return () => watch.disconnect()
+  }, [])
+
+  const left = 44
+  const right = width - 16
+  const top = 14
+  const bottom = 122
+  const xOf = (i: number) => left + (i / (weeks.length - 1 || 1)) * (right - left)
+  const yOf = (avg: number) => bottom - (avg / 5) * (bottom - top)
+  const room = Math.max(2, Math.floor((right - left) / 58))
+  const labelEvery = Math.max(1, Math.ceil(weeks.length / room))
+  const tick = { fontSize: 'var(--t-micro)', fill: 'var(--ink)' }
+  const axis = { fontSize: 'var(--t-mini)', fill: 'var(--ink)' }
+
+  return (
+    <div ref={box}>
+      <svg
+        viewBox={`0 0 ${width} ${CHART_H}`}
+        width={width}
+        height={CHART_H}
+        role="img"
+        aria-label="Your average quality score by week"
+        style={{ display: 'block', maxWidth: '100%' }}
+      >
+        {[0, 1, 2, 3, 4, 5].map((g) => (
+          <g key={g}>
+            <line x1={left} x2={right} y1={yOf(g)} y2={yOf(g)} stroke="var(--hair)" strokeWidth={1} />
+            <text x={left - 8} y={yOf(g) + 3.5} textAnchor="end" style={tick}>
+              {g}
+            </text>
+          </g>
+        ))}
+        <line x1={left} x2={left} y1={top} y2={bottom} stroke="var(--ink)" strokeOpacity={0.4} />
+        <line x1={left} x2={right} y1={bottom} y2={bottom} stroke="var(--ink)" strokeOpacity={0.4} />
+        <path
+          d={linePath(weeks.map((w, i) => (w.avg === null ? null : [xOf(i), yOf(w.avg)])))}
+          fill="none"
+          stroke="var(--brand2)"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {weeks.map((w, i) =>
+          w.avg === null ? null : (
+            <circle key={i} cx={xOf(i)} cy={yOf(w.avg)} r={4} fill="var(--brand2)">
+              <title>
+                {`${fmtDate(w.from)} – ${fmtDate(w.to)}: ${w.avg.toFixed(2)} from ${w.n} check${w.n === 1 ? '' : 's'}`}
+              </title>
+            </circle>
+          ),
+        )}
+        {weeks.map((w, i) =>
+          i % labelEvery === 0 || i === weeks.length - 1 ? (
+            <text key={i} x={xOf(i)} y={140} textAnchor="middle" style={{ ...tick, fontFamily: 'var(--mono)' }}>
+              {weekTick(w.to)}
+            </text>
+          ) : null,
+        )}
+        <text x={(left + right) / 2} y={166} textAnchor="middle" style={axis}>
+          Week ending
+        </text>
+        <text
+          x={13}
+          y={(top + bottom) / 2}
+          textAnchor="middle"
+          transform={`rotate(-90 13 ${(top + bottom) / 2})`}
+          style={axis}
+        >
+          Average score
+        </text>
+      </svg>
+    </div>
+  )
+}
 
 function weeklyAverages(rows: QcEntry[], from: Date, to: Date): WeekPoint[] {
   const weeks: WeekPoint[] = []
@@ -263,7 +360,15 @@ export default function MyPerformance() {
       <Kpis>
         <Kpi
           title="Your score"
-          value={mineAvg !== null ? <span className="ok">{mineAvg.toFixed(2)}</span> : '—'}
+          value={
+            qcLog.isPending ? (
+              <SkeletonValue />
+            ) : mineAvg !== null ? (
+              <span className="ok">{mineAvg.toFixed(2)}</span>
+            ) : (
+              '—'
+            )
+          }
           detail={
             mineAvg === null || !spread
               ? 'out of 5'
@@ -278,153 +383,62 @@ export default function MyPerformance() {
               ? `Everyone here averages ${spread.lo.toFixed(2)} to ${spread.hi.toFixed(2)} across the full log`
               : 'The average of every rating in range'
           }
+          chevron
           onClick={() => showChecks('all')}
         />
         <Kpi
           title="Work checked"
-          value={rows.length}
+          value={qcLog.isPending ? <SkeletonValue /> : rows.length}
           detail="pieces of your work a colleague reviewed"
+          chevron
           hint="Every check in range"
           onClick={() => showChecks('all')}
         />
         <Kpi
           title="No issues found"
-          value={<span className="ok">{clean}</span>}
+          value={qcLog.isPending ? <SkeletonValue /> : <span className="ok">{clean}</span>}
           detail={`${rows.length ? Math.round((clean / rows.length) * 100) : 0}% of the checks`}
+          chevron
           hint="The ones with nothing raised"
           onClick={() => showChecks('clean')}
         />
         <Kpi
           title="Keeps happening"
-          value={<span className={habits.length ? 'warn' : 'ok'}>{habits.length}</span>}
+          value={
+            qcLog.isPending ? (
+              <SkeletonValue />
+            ) : (
+              <span className={habits.length ? 'warn' : 'ok'}>{habits.length}</span>
+            )
+          }
           tone={habits.length ? 'warn' : undefined}
           detail={habits.length ? 'the same issue more than once' : 'nothing came up twice'}
+          chevron
           hint="The ones worth changing a habit for"
           onClick={showHabits}
         />
         <Kpi
           title="Finished in time"
-          value={t ? `${t.onBudget}%` : '—'}
+          value={history.isPending ? <SkeletonValue /> : t ? `${t.onBudget}%` : '—'}
           valueTone={t ? (t.vsPeers >= -5 ? 'ok' : 'warn') : undefined}
           tone={t && t.vsPeers < -5 ? 'warn' : undefined}
           detail={t ? `of your work — others doing the same: ${t.expected}%` : 'no timed work in range'}
+          chevron
           hint="How often you finish inside the time allowed for the stage"
-          onClick={can('assign') ? () => focusSection('mfDept') : budgetHelp}
+          onClick={can('assign') && dept ? () => focusSection('mfDept') : budgetHelp}
         />
       </Kpis>
 
       <Card padded style={{ marginTop: 16 }}>
         <Label>Your score, week by week</Label>
         {chartedWeeks > 1 ? (
-          (() => {
-            const PLOT_LEFT = 42
-            const PLOT_RIGHT = 596
-            const PLOT_TOP = 14
-            const PLOT_BOTTOM = 122
-            const xOf = (i: number) =>
-              PLOT_LEFT + (i / (weeks.length - 1 || 1)) * (PLOT_RIGHT - PLOT_LEFT)
-            const yOf = (avg: number) => PLOT_BOTTOM - (avg / 5) * (PLOT_BOTTOM - PLOT_TOP)
-            const labelEvery = weeks.length > 8 ? 2 : 1
-            return (
-              <>
-                <svg
-                  viewBox="0 0 610 178"
-                  width="100%"
-                  height={178}
-                  preserveAspectRatio="none"
-                  role="img"
-                  aria-label="Your average quality score by week"
-                >
-                  {[0, 1, 2, 3, 4, 5].map((g) => (
-                    <g key={g}>
-                      <line
-                        x1={PLOT_LEFT}
-                        x2={PLOT_RIGHT}
-                        y1={yOf(g)}
-                        y2={yOf(g)}
-                        stroke="var(--hair)"
-                        strokeWidth={1}
-                      />
-                      <text x={PLOT_LEFT - 8} y={yOf(g) + 3} textAnchor="end" fontSize="9" fill="var(--gr)">
-                        {g}
-                      </text>
-                    </g>
-                  ))}
-                  <line
-                    x1={PLOT_LEFT}
-                    x2={PLOT_LEFT}
-                    y1={PLOT_TOP}
-                    y2={PLOT_BOTTOM}
-                    stroke="var(--gr)"
-                    strokeWidth={1}
-                  />
-                  <line
-                    x1={PLOT_LEFT}
-                    x2={PLOT_RIGHT}
-                    y1={PLOT_BOTTOM}
-                    y2={PLOT_BOTTOM}
-                    stroke="var(--gr)"
-                    strokeWidth={1}
-                  />
-                  <path
-                    d={linePath(weeks.map((w, i) => (w.avg === null ? null : [xOf(i), yOf(w.avg)])))}
-                    fill="none"
-                    stroke="var(--brand2)"
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  {weeks.map((w, i) =>
-                    w.avg === null ? null : (
-                      <circle key={i} cx={xOf(i)} cy={yOf(w.avg)} r={3.5} fill="var(--brand2)">
-                        <title>
-                          {`${fmtDate(w.from)} – ${fmtDate(w.to)}: ${w.avg.toFixed(2)} from ${w.n} check${w.n === 1 ? '' : 's'}`}
-                        </title>
-                      </circle>
-                    ),
-                  )}
-                  {weeks.map((w, i) =>
-                    i % labelEvery === 0 || i === weeks.length - 1 ? (
-                      <text
-                        key={i}
-                        x={xOf(i)}
-                        y={140}
-                        textAnchor="middle"
-                        fontSize="9"
-                        fill="var(--gr)"
-                        fontFamily="var(--mono)"
-                      >
-                        {weekTick(w.to)}
-                      </text>
-                    ) : null,
-                  )}
-                  <text
-                    x={(PLOT_LEFT + PLOT_RIGHT) / 2}
-                    y={164}
-                    textAnchor="middle"
-                    fontSize="10"
-                    fill="var(--gr)"
-                  >
-                    Week ending
-                  </text>
-                  <text
-                    x={0}
-                    y={0}
-                    textAnchor="middle"
-                    fontSize="10"
-                    fill="var(--gr)"
-                    transform={`rotate(-90 14 ${(PLOT_TOP + PLOT_BOTTOM) / 2}) translate(14 ${(PLOT_TOP + PLOT_BOTTOM) / 2})`}
-                  >
-                    Average score
-                  </text>
-                </svg>
-                <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 6 }}>
-                  Weekly average against the full 0–5 scale, so a flat line near the top means the
-                  scale is not finding much to disagree about — not that nothing happened.
-                </p>
-              </>
-            )
-          })()
+          <>
+            <WeeklyChart weeks={weeks} />
+            <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 6 }}>
+              Weekly average against the full 0–5 scale, so a flat line near the top means the
+              scale is not finding much to disagree about — not that nothing happened.
+            </p>
+          </>
         ) : (
           <p className="gr" style={{ fontSize: 'var(--t-small)', margin: 0 }}>
             Not enough checks spread across separate weeks yet to show a trend — widen the range.
@@ -475,6 +489,7 @@ export default function MyPerformance() {
                           className="rw"
                           style={{
                             background: 'var(--brandsoft)',
+                            border: '1px solid color-mix(in srgb, var(--brand) 22%, transparent)',
                             borderRadius: 9,
                             padding: '12px 14px',
                             marginTop: 11,
@@ -516,7 +531,9 @@ export default function MyPerformance() {
           {oneOffs.length ? (
             <>
               <SectionHead>Worth knowing — these came up once</SectionHead>
-              <Card>
+              {/* Clipped, or the rows' square white corners paint over the card's
+                  rounded edge and the box disappears into the page. */}
+              <Card style={{ overflow: 'hidden' }}>
                 <Rows bare>
                   {oneOffs.map(([reason]) => {
                     const x = below.find((y) => y.note === reason)
@@ -546,6 +563,9 @@ export default function MyPerformance() {
           <div className="two" style={{ marginTop: 18 }}>
             <Card padded>
               <Label>What you’re doing well, and where marks come off</Label>
+              <p style={{ fontSize: 'var(--t-label)', margin: '0 0 6px' }}>
+                Your average score for each, out of 5 · how many times marks came off for it.
+              </p>
               {axes.map((a) => (
                 <BarRow
                   key={a.name}
@@ -569,6 +589,7 @@ export default function MyPerformance() {
                   className="rw"
                   style={{
                     background: 'var(--oksoft)',
+                    border: '1px solid color-mix(in srgb, var(--ok) 28%, transparent)',
                     borderRadius: 9,
                     padding: '11px 13px',
                     marginTop: 12,
@@ -598,14 +619,34 @@ export default function MyPerformance() {
                     </b>
                     <span className="gr">of the time allowed for your stage, typically</span>
                   </div>
-                  <span className="bar" style={{ height: 12 }}>
-                    <i
+                  {/* The bar puts 1× — exactly the time allowed — at 70%, so the mark
+                      there is the line to be inside of. It was a <span>, which is inline,
+                      so its height was ignored and the bar never drew at all. */}
+                  <div style={{ position: 'relative' }}>
+                    <div className="bar" style={{ height: 12 }}>
+                      <i
+                        style={{
+                          width: `${Math.min(100, Math.round(t.ratio * 70))}%`,
+                          background: t.ratio > 1 ? 'var(--warn)' : 'var(--ok)',
+                        }}
+                      />
+                    </div>
+                    <span
+                      aria-hidden="true"
                       style={{
-                        width: `${Math.min(100, Math.round(t.ratio * 70))}%`,
-                        background: t.ratio > 1 ? 'var(--warn)' : 'var(--ok)',
+                        position: 'absolute',
+                        left: '70%',
+                        top: -3,
+                        height: 18,
+                        width: 2,
+                        borderRadius: 1,
+                        background: 'var(--ink)',
                       }}
                     />
-                  </span>
+                  </div>
+                  <p style={{ fontSize: 'var(--t-label)', margin: '6px 0 0' }}>
+                    The mark is the time allowed. Short of it is faster; past it is over.
+                  </p>
                   <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 12 }}>
                     {t.erratic
                       ? `Your typical order is comfortably inside budget. What costs you is the spread — ${t.over} of ${t.c} ran long. Those are worth a look: if the long ones have something in common, that is the thing to raise, not your pace.`
