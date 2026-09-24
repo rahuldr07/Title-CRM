@@ -1,5 +1,5 @@
 import { STAFF } from '@/data/people'
-import { ROLELIST } from '@/data/org'
+import { can } from './permissions'
 import type { Person } from '@/data/types'
 
 export type CredentialCheck = { ok: true; person: Person } | { ok: false; error: string }
@@ -11,16 +11,13 @@ const normalise = (email: string) => email.trim().toLowerCase()
 export const personByEmail = (email: string): Person | undefined =>
   STAFF.find((s) => (s.e ?? '').toLowerCase() === normalise(email))
 
-const hasCapability = (person: Person, capability: string) =>
-  ROLELIST.find((r) => r.id === person.r)?.p.includes(capability) ?? false
-
 const active = () => STAFF.filter((s) => s.active !== false)
 
 export const adminAccount = (): Person | undefined =>
-  active().find((s) => hasCapability(s, 'all') && hasCapability(s, 'people'))
+  active().find((s) => can(s, 'all') && can(s, 'people'))
 
 export const staffAccount = (): Person | undefined =>
-  active().find((s) => s.dep.length > 0 && !hasCapability(s, 'all'))
+  active().find((s) => s.dep.length > 0 && !can(s, 'all'))
 
 export interface CredentialOptions {
   passwordChecked: boolean

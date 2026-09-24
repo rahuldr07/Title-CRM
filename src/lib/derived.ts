@@ -4,7 +4,7 @@ import {
   currentCounties as COUNTIES_OF,
   currentLinkTypes as LINKTYPES_OF,
 } from '@/state/counties'
-import { ORDERS } from '@/data/production'
+import { allOrders } from '@/state/orders'
 import { LEADS, STALE_BAD, STALE_WARN } from '@/data/business'
 import { STAFF } from '@/data/people'
 import { DEPTLIST } from '@/data/org'
@@ -14,9 +14,9 @@ import type { ChipKind, County, CountyLink, Lead, LinkStatus } from '@/data/type
 
 export const days = (d: Date) => Math.floor((now().getTime() - d.getTime()) / 86400000)
 
-export const openOrders = () => ORDERS.filter((o) => !o.done)
-export const pastDue = () => ORDERS.filter((o) => orderState(o) === 'late')
-export const atRisk = () => ORDERS.filter((o) => orderState(o) === 'soon')
+export const openOrders = () => allOrders().filter((o) => !o.done)
+export const pastDue = () => allOrders().filter((o) => orderState(o) === 'late')
+export const atRisk = () => allOrders().filter((o) => orderState(o) === 'soon')
 
 export const pastDueCount = () => pastDue().length
 export const atRiskCount = () => atRisk().length

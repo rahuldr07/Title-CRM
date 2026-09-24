@@ -2,9 +2,10 @@ import { useParams, useSearch } from '@tanstack/react-router'
 import { useGo } from '@/lib/nav'
 import { Assumption, Btn, Card, DetailRow, Label, PageHead, Rows } from '@/components/ui'
 import { useSession } from '@/state/session'
-import { PAYCFG, PAYMONTHS, PAYRUNS, RUNSTATE } from '@/data/hrms'
-import { STAFF } from '@/data/people'
-import { inr, inr2, payslipOf, words, ytd } from '@/lib/payroll'
+import { PAYCFG, PAYMONTHS, RUNSTATE } from '@/data/hrms'
+import { useRuns } from '@/state/payruns'
+import { useStaff } from '@/state/company'
+import { inr, inr2, payslipOf, words, ytd, fyOfPayMonth } from '@/lib/payroll'
 import { roleName } from '@/lib/permissions'
 import { usePayslipDownloads } from './payslips/usePayslipDownloads'
 
@@ -40,8 +41,10 @@ export default function PayslipDetail() {
   const navigate = useGo()
   const { me, tenant, can } = useSession()
   const download = usePayslipDownloads()
+  const runs = useRuns()
+  const staff = useStaff()
 
-  const person = STAFF.find((x) => x.id === personId)
+  const person = staff.find((x) => x.id === personId)
   const month = m && PAYMONTHS.includes(m) ? m : PAYMONTHS[PAYMONTHS.length - 1]
   const mine = person?.id === me.id
 
@@ -94,7 +97,7 @@ export default function PayslipDetail() {
     )
   }
 
-  const run = PAYRUNS[month]
+  const run = runs[month]
 
   if (mine && !run.published) {
     return (
@@ -132,11 +135,11 @@ export default function PayslipDetail() {
         sub={`${person.n} · ${month}`}
         actions={
           <>
-            <Btn variant="ghost" onClick={() => window.print()}>
-              Print
-            </Btn>
+            {/* Staff expect a PDF: the print dialog saves one, and the print
+                stylesheet leaves only the slip on the page. */}
+            <Btn onClick={() => window.print()}>Print or save as PDF</Btn>
             <Btn variant="ghost" onClick={() => download.payslip(person, month)}>
-              Download
+              Download CSV
             </Btn>
           </>
         }
@@ -255,7 +258,7 @@ export default function PayslipDetail() {
             </p>
           </Card>
           <Card padded style={{ background: 'var(--tint)' }}>
-            <Label>Year to date — {PAYMONTHS[0].split(' ')[1]} onward</Label>
+            <Label>Year to date — {fyOfPayMonth(month)}</Label>
             <Row label="Gross earnings" value={y.gross} />
             <Row label="Deductions" value={y.ded} tone="warn" />
             <Row label="Tax deducted" value={y.tds} tone="warn" />

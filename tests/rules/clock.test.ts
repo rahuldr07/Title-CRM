@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { SEED_NOW, now, resetClock, setClock } from '@/lib/clock'
 import { daysSince, dueMeta, fmtDate } from '@/lib/format'
 import { atRiskCount, openCount, pastDueCount } from '@/lib/derived'
-import { ORDERS } from '@/data/production'
+import { allOrders } from '@/state/orders'
 
 /**
  * The clock used to be a literal read directly by forty-odd call sites. These
@@ -83,7 +83,8 @@ describe('the counts the shell reads', () => {
 
   it('never counts a delivered order as outstanding', () => {
     setClock(() => new Date(SEED_NOW.getTime() + 365 * 24 * 3600_000))
-    expect(openCount()).toBe(ORDERS.filter((o) => !o.done).length)
+    /* The shell counts every order — the seed register and today's run — as one list. */
+    expect(openCount()).toBe(allOrders().filter((o) => !o.done).length)
     expect(pastDueCount()).toBeLessThanOrEqual(openCount())
   })
 })

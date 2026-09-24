@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useGo } from '@/lib/nav'
+import { useGo, useMayOpen } from '@/lib/nav'
 import { BarRow, Btn, Card, Chip, Empty, Label, SectionHead } from '@/components/ui'
 import { turnaroundCsv } from '@/lib/report-csv'
 import { useReportExport } from '@/state/reportExport'
@@ -23,6 +23,7 @@ export function Turnaround({ deliveries }: { deliveries: Delivery[] }) {
   const [focus, setFocus] = useState('all')
 
   const toBudgets = () => navigate({ to: '/company', search: { tab: 'Turnaround & SLA' } })
+  const mayOpenCompany = useMayOpen('company')
 
   const r = resolveRange(range)
   const d = useMemo(() => deliveries.filter((x) => inRange(x.d, r)), [deliveries, r])
@@ -391,9 +392,13 @@ export function Turnaround({ deliveries }: { deliveries: Delivery[] }) {
             <Label>Where the time goes — median hours per department, against the budget it was given</Label>
             <p className="gr" style={{ fontSize: 'var(--t-small)', margin: '6px 0 14px' }}>
               The pale bar is the budget from{' '}
-              <button type="button" className="br" style={{ fontWeight: 600 }} onClick={toBudgets}>
-                Company → Stage budgets
-              </button>
+              {mayOpenCompany ? (
+                <button type="button" className="br" style={{ fontWeight: 600 }} onClick={toBudgets}>
+                  Company → Stage budgets
+                </button>
+              ) : (
+                'Company → Stage budgets'
+              )}
               ; the solid bar is what actually happened.
             </p>
             {stages.map((x) => (

@@ -1,6 +1,9 @@
 import { INVOICES } from '@/data/business'
 import { iso, parseIso, r2 } from '@/lib/format'
-import type { Invoice } from '@/data/types'
+import { now } from '@/lib/clock'
+import { currentClients } from '@/state/company'
+import { paidSince } from '@/state/invoices'
+import type { Client, Invoice } from '@/data/types'
 
 export const INVOICE_MONTHS: string[] = [
   ...new Map(
@@ -89,3 +92,39 @@ export const sumBy = (list: Invoice[], k: 'amt' | 'paid') =>
 export const balance = (i: Invoice) => r2(i.amt - i.paid)
 
 export const outstandingOf = (list: Invoice[]) => r2(sumBy(list, 'amt') - sumBy(list, 'paid'))
+
+export type InvoiceStatus = Invoice['st']
+
+/* "Net 30" is thirty days; terms that name no days ("Per order") are due on the day of issue. */
+const termDays = (terms: string): number => Number(/net\s*(\d+)/i.exec(terms)?.[1] ?? 0)
+
+/** The last moment the invoice can be paid on time: the end of the issue day plus the terms. */
+export function dueOn(i: Invoice, terms: string): Date {
+  const d = new Date(i.issued)
+  d.setDate(d.getDate() + termDays(terms))
+  d.setHours(23, 59, 59, 999)
+  return d
+}
+
+/* Worked out rather than stored, because a stored status does not move when the
+   clock passes the terms — which is how a month-late invoice read "Part paid". */
+export function statusOf(i: Invoice, terms: string, today: Date = now()): InvoiceStatus {
+  if (balance(i) <= 0) return 'paid'
+  if (today > dueOn(i, terms)) return 'overdue'
+  return i.paid > 0 ? 'part' : 'open'
+}
+
+/** The register, with payments taken this session and each status worked out against the client's current terms. */
+export function invoicesNow(clients: Client[] = currentClients()): Invoice[] {
+  const terms = new Map(clients.map((c) => [c.n, c.terms]))
+  return INVOICES.map((seed) => {
+    const i = { ...seed, paid: r2(seed.paid + paidSince(seed.id)) }
+    return { ...i, st: statusOf(i, terms.get(i.cl) ?? '') }
+  })
+}
+
+/** A client's orders that no invoice bills: its orders less the orders its invoices carry. */
+export function unbilledOrders(client: Pick<Client, 'n' | 'orders'>, invoices: Invoice[]): number {
+  const billed = invoices.filter((i) => i.cl === client.n).reduce((a, i) => a + i.orders, 0)
+  return Math.max(0, client.orders - billed)
+}

@@ -23,11 +23,12 @@ import { RequireCap } from '@/components/RequireCap'
 import { useNotBuilt } from '@/components/notBuilt'
 import { useUi } from '@/state/ui'
 import { useClients, useClock, useSla } from '@/state/company'
+import { usePayments } from '@/state/invoices'
 import { useClientEditor } from '@/components/editors/useClientEditor'
 import { PrefixForm } from './clients/PrefixForm'
 import { removePrefix, usePrefixes } from '@/state/prefixes'
-import { INVOICES, ISTATUS } from '@/data/business'
-import { balance, outstandingOf } from '@/lib/invoices'
+import { ISTATUS } from '@/data/business'
+import { balance, invoicesNow, outstandingOf, unbilledOrders } from '@/lib/invoices'
 import { money, r2 } from '@/lib/format'
 
 const TABS = ['Overview', 'Turnaround', 'Invoices', 'Order prefixes'] as const
@@ -45,6 +46,7 @@ function ClientDetail() {
   const notBuilt = useNotBuilt()
   const { editClient } = useClientEditor()
   const clients = useClients()
+  usePayments()
   const sla = useSla()
   const clock = useClock()
   const prefixMap = usePrefixes()
@@ -59,7 +61,8 @@ function ClientDetail() {
   const c = client
   const outstanding = r2(c.total - c.paid)
   const collected = c.total ? Math.round((c.paid / c.total) * 100) : 0
-  const mine = INVOICES.filter((x) => x.cl === c.n).sort((a, b) => +b.issued - +a.issued)
+  const unbilled = unbilledOrders(c, invoicesNow())
+  const mine = invoicesNow().filter((x) => x.cl === c.n).sort((a, b) => +b.issued - +a.issued)
   const theirSla = sla.filter((s) => s.cl === c.n)
   const prefixes = prefixMap[c.n] ?? []
 
@@ -166,11 +169,11 @@ function ClientDetail() {
         />
       </Kpis>
 
-      {c.orders !== c.inv ? (
+      {unbilled ? (
         <Banner
           kind="r"
           icon="⚑"
-          title={`${(c.orders - c.inv).toLocaleString()} orders with no invoice`}
+          title={`${unbilled.toLocaleString()} orders with no invoice`}
           style={{ marginTop: 16 }}
           actions={
             <Btn
@@ -184,7 +187,8 @@ function ClientDetail() {
             </Btn>
           }
         >
-          {c.orders.toLocaleString()} orders against {c.inv.toLocaleString()} invoices. Either work
+          {c.orders.toLocaleString()} orders, of which {mine.reduce((a, i) => a + i.orders, 0).toLocaleString()} are billed on
+          {' '}{mine.length} invoices. Either work
           that never completed, or billing that never happened.
           <div className="bs">Worth reconciling before it becomes a year of drift.</div>
         </Banner>

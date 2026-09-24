@@ -9,6 +9,10 @@ import {
   structureOf,
   taxUnder,
   ytd,
+  fyOf,
+  companyCost,
+  deductionParts,
+  payTotals,
 } from '@/lib/payroll'
 import { mins } from '@/lib/workingDay'
 import { resetClock, setClock } from '@/lib/clock'
@@ -149,7 +153,8 @@ describe('a payslip', () => {
 describe('year to date', () => {
   it('is the sum of the months up to and including the one shown', () => {
     staff.slice(0, 5).forEach((p) => {
-      const upto = PAYMONTHS.slice(0, PAYMONTHS.indexOf(month) + 1)
+      /* Up to the month shown, within its financial year (April to March). */
+      const upto = PAYMONTHS.slice(0, PAYMONTHS.indexOf(month) + 1).filter((m) => m !== 'Mar 2026')
       const byHand = upto.reduce((a, m) => a + payslipOf(p, m).net, 0)
       expect(ytd(p, month).net, `${p.n}: YTD net disagrees with the months it covers`).toBe(byHand)
     })
@@ -356,5 +361,76 @@ describe('a punch time with a part missing', () => {
     }
     expect(mins('09')).toBe(540)
     expect(mins('')).toBe(0)
+  })
+})
+
+/*
+ * Year to date runs April to March, the Indian financial year — which is what
+ * a payslip's YTD and Form 16 are counted against. It summed from the first
+ * month on record instead, so July's year to date carried March, a month of
+ * the year before.
+ */
+describe('year to date', () => {
+  const p = staff[0]
+  const netOf = (months: string[]) => months.reduce((a, m) => a + payslipOf(p, m).net, 0)
+
+  it('starts in April', () => {
+    expect(ytd(p, 'Jul 2026').net).toBe(netOf(['Apr 2026', 'May 2026', 'Jun 2026', 'Jul 2026']))
+  })
+
+  it('closes the year in March', () => {
+    expect(ytd(p, 'Mar 2026').net).toBe(netOf(['Mar 2026']))
+  })
+
+  it('says how many months it covers', () => {
+    expect(ytd(p, 'May 2026').months).toBe(2)
+    expect(ytd(p, 'Mar 2026').months).toBe(1)
+  })
+
+  it('names the financial year a date falls in', () => {
+    expect(fyOf(new Date(2026, 7, 3))).toBe('FY 2026-27')
+    expect(fyOf(new Date(2026, 2, 31))).toBe('FY 2025-26')
+    expect(fyOf(new Date(2026, 3, 1))).toBe('FY 2026-27')
+  })
+})
+
+/*
+ * What the payroll screen adds up has to add up.
+ *
+ * The Deductions tile named PF, PT and TDS and showed a total that also carried
+ * ESI and loan recoveries, so its parts summed to ₹56,331 under a ₹77,482 total;
+ * and the cost of the month left out the employer's share of ESI.
+ */
+describe('the month’s totals', () => {
+  const t = () => payTotals(month)
+
+  it('lists deductions whose parts sum to the total', () => {
+    const parts = deductionParts(t())
+    expect(parts.reduce((a, [, v]) => a + v, 0)).toBe(t().ded)
+  })
+
+  it('charges the employer ESI exactly where the employee pays it, at 3.25% against 0.75%', () => {
+    const covered = t().list.filter((x) => x.esi > 0)
+    expect(covered.length).toBeGreaterThan(0)
+    t().list.forEach((x) => {
+      expect(x.esiEr > 0, x.p.n).toBe(x.esi > 0)
+      expect(Math.abs(x.esiEr - (x.esi * 3.25) / PAYCFG.esiPct), x.p.n).toBeLessThan(5)
+    })
+  })
+
+  it('counts employer ESI in what the month costs', () => {
+    const x = t()
+    expect(companyCost(x)).toBe(x.gross + x.erpf + x.esiEr + x.grat)
+  })
+})
+
+describe('the register', () => {
+  it('reads across to net pay: gross less every deduction, plus reimbursements', () => {
+    const t = payTotals(month)
+    t.list.forEach((x) => {
+      const loans = x.loanDeds.reduce((a, d) => a + d.amount, 0)
+      expect(x.gross - x.epf - x.pt - x.esi - x.tds - loans + x.claims, x.p.n).toBe(x.net)
+    })
+    expect(t.claims).toBe(t.list.reduce((a, x) => a + x.claims, 0))
   })
 })

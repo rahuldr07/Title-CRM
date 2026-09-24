@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CLASHRULES, approvesFor, leaveCheck, managerOf } from '@/lib/leave'
+import { CLASHRULES, approvesFor, availOn, leaveCheck, managerOf, onLeaveOn } from '@/lib/leave'
 import { leaveBalance, payTotals, payslipOf } from '@/lib/payroll'
 import { ATT, LEAVE, LEAVEPOLICY } from '@/data/hrms'
 import { STAFF } from '@/data/people'
@@ -486,5 +486,55 @@ describe('what it lets through in silence', () => {
 
     expect(c.notes).toEqual([])
     expect(c.overBalance).toBe(2)
+  })
+})
+
+/*
+ * Leave covers whole days. Its dates are stored at midnight, so comparing them
+ * with a time of day ended a one-day leave at the stroke of midnight: someone
+ * away on 3 Aug was "on leave" to attendance, which asks at midnight, and free
+ * at noon to the assignment run, which asks at the hour an order arrived.
+ */
+describe('being on leave on a day', () => {
+  const day = (d: number, h = 0) => new Date(2026, 7, d, h)
+  const oneDay: Leave = {
+    id: 'LT1', who: 'us', type: 'cl', from: day(3), to: day(3), days: 1,
+    st: 'approved', reason: 'x', by: 'Ashok S', at: day(1),
+  }
+
+  it('covers every hour of the day', () => {
+    withLeave([oneDay], () => {
+      expect(onLeaveOn('us', day(3, 0))).toBe(true)
+      expect(onLeaveOn('us', day(3, 12))).toBe(true)
+      expect(onLeaveOn('us', day(3, 23))).toBe(true)
+    })
+  })
+
+  it('ends with the day', () => {
+    withLeave([oneDay], () => {
+      expect(onLeaveOn('us', day(4, 0))).toBe(false)
+      expect(onLeaveOn('us', day(2, 23))).toBe(false)
+    })
+  })
+
+  it('counts only approved leave', () => {
+    withLeave([{ ...oneDay, st: 'pending' }], () => {
+      expect(onLeaveOn('us', day(3, 12))).toBe(false)
+    })
+  })
+})
+
+describe('availability on a day', () => {
+  it('is on leave while approved leave covers it, whatever the standing flag says', () => {
+    const p = person('us')
+    const leave: Leave = {
+      id: 'LT2', who: p.id, type: 'cl', from: new Date(2026, 7, 3), to: new Date(2026, 7, 3), days: 1,
+      st: 'approved', reason: 'x', by: 'Ashok S', at: new Date(2026, 7, 1),
+    }
+    withLeave([leave], () => {
+      expect(availOn({ ...p, avail: 'ok' }, new Date(2026, 7, 3, 12))).toBe('leave')
+      expect(availOn({ ...p, avail: 'ok' }, new Date(2026, 7, 4, 12))).toBe('ok')
+      expect(availOn({ ...p, avail: 'shift' }, new Date(2026, 7, 4, 12))).toBe('shift')
+    })
   })
 })

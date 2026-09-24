@@ -1,22 +1,27 @@
-import { useState } from 'react'
-import { Card, CardHead, Chip, Field, Form, KeyValues, PageHead, Rows, SectionHead, Tabs } from '@/components/ui'
-import { ORDERS } from '@/data/production'
+import { useState, type ReactNode } from 'react'
+import { useSearch } from '@tanstack/react-router'
+import { Card, CardHead, Chip, Field, Form, KeyValues, PageHead, Rows, Tabs } from '@/components/ui'
+import { partiesOf, setOrderField, useOrders, workingOn } from '@/state/orders'
 import { PRODUCTS } from '@/data/catalog'
-import { STAGES } from '@/data/org'
-import { TZ, fmtDT, money } from '@/lib/format'
-import { whoName } from '@/lib/permissions'
+import { TZ, fmtDT, money, countyName } from '@/lib/format'
+import { useSession } from '@/state/session'
 
 const TABS = ['Capture', 'Preview', 'Documents'] as const
 type Tab = (typeof TABS)[number]
 
 export default function CommitmentReport() {
+  const { can, me } = useSession()
+  const orders = useOrders()
   const [tab, setTab] = useState<Tab>('Capture')
-  const [orderId, setOrderId] = useState(ORDERS[ORDERS.length - 1].id)
-  const [vesting, setVesting] = useState('Sara J. Bahorik and Michael Bahorik, husband and wife')
-  const [legal, setLegal] = useState('Lot 14, Block 3, Ridgeview Plan, as recorded in Plat Book 22, Page 41')
+  const { order: asked } = useSearch({ from: '/commitment' })
+  const [orderId, setOrderId] = useState(asked ?? orders[0]?.id ?? '')
 
-  const o = ORDERS.find((x) => x.id === orderId) ?? ORDERS[0]
+  const o = orders.find((x) => x.id === orderId) ?? orders[0]
+  if (!o) return <PageHead title="Commitment report" sub="There are no orders to build a commitment from." />
   const prod = PRODUCTS.find((p) => p.id === o.pr)
+  /* Vesting and the legal description are this order's, captured here; a blank is
+     left blank rather than filled from a sample order. */
+  const { vesting, legal } = partiesOf(o, workingOn(o.id))
 
   const docs = [
     ['Search package', true],
@@ -42,7 +47,7 @@ export default function CommitmentReport() {
           <Form>
             <Field label="Order">
               <select className="inp mono" value={orderId} onChange={(e) => setOrderId(e.target.value)}>
-                {ORDERS.map((x) => (
+                {orders.map((x) => (
                   <option key={x.id} value={x.id}>
                     {x.id} — {x.pr} — {x.prop}
                   </option>
@@ -54,11 +59,23 @@ export default function CommitmentReport() {
             </Field>
             <div className="fld" style={{ gridColumn: '1/-1' }}>
               <label htmlFor="rg-vest">Vesting</label>
-              <input className="inp" id="rg-vest" value={vesting} onChange={(e) => setVesting(e.target.value)} />
+              <input
+                className="inp"
+                id="rg-vest"
+                placeholder="not captured — who holds title"
+                value={vesting}
+                onChange={(e) => setOrderField(o.id, 'vs', e.target.value, me.n)}
+              />
             </div>
             <div className="fld" style={{ gridColumn: '1/-1' }}>
               <label htmlFor="rg-legal">Legal description</label>
-              <textarea className="inp" id="rg-legal" value={legal} onChange={(e) => setLegal(e.target.value)} />
+              <textarea
+                className="inp"
+                id="rg-legal"
+                placeholder="not captured — lot, block, plan and recording reference"
+                value={legal}
+                onChange={(e) => setOrderField(o.id, 'ld', e.target.value, me.n)}
+              />
             </div>
           </Form>
         </Card>
@@ -74,29 +91,16 @@ export default function CommitmentReport() {
                 ['Client', o.cl],
                 ['Product', `${prod?.id} — ${prod?.n}`],
                 ['Property', o.prop],
-                ['County', `${o.co} County, ${o.st}`],
+                ['County', `${countyName(o.co, o.st)}, ${o.st}`],
                 ['Received', <span className="mono">{`${fmtDT(o.recv)} ${TZ}`}</span>],
                 ['Due', <span className="mono">{`${fmtDT(o.due)} ${TZ}`}</span>],
-                ['Fee', <span className="mono">{money(o.fee)}</span>],
-                ['Vesting', vesting],
-                ['Legal description', legal],
+                ...(can('pricing') ? [['Fee', <span className="mono">{money(o.fee)}</span>] as [string, ReactNode]] : []),
+                ['Vesting', vesting || '—'],
+                ['Legal description', legal || '—'],
               ]}
             />
           </div>
 
-          <SectionHead>Who worked it</SectionHead>
-          <Rows>
-            {STAGES.filter((s) => o.a[s]).map((s) => (
-              <div className="rw" key={s}>
-                <span className="ok">✓</span>
-                <span>
-                  <b>{s}</b>
-                  <div className="sd">{whoName(o.a[s]!)}</div>
-                </span>
-                <span />
-              </div>
-            ))}
-          </Rows>
         </Card>
       ) : null}
 

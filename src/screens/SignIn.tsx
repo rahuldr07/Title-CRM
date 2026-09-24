@@ -365,9 +365,10 @@ export default function SignIn() {
 
         {DEMO_IDENTITY ? (
           <p className="si-demo">
-            There is no database behind this build yet, so the password is asked for but not
-            checked. <b className="mono">{ADMIN_EMAIL}</b> signs in as the administrator; any other
-            address signs in as staff.
+            The password is asked for but not checked until the database is connected. Sign in with
+            anyone’s address on the roster to arrive as them, with their role;{' '}
+            <b className="mono">{ADMIN_EMAIL}</b> is the administrator, and an address not on the
+            roster opens a staff account.
           </p>
         ) : null}
       </section>

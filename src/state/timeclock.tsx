@@ -1,12 +1,16 @@
 import { createContext, use, useCallback, useMemo, useReducer, type ReactNode } from 'react'
-import { OT, type Overtime } from '@/data/hrms'
+import type { Overtime } from '@/data/hrms'
+import { claimOvertime as claimOt, decideOvertime as decideOt, useOvertime } from './overtime'
 import { SWAPS } from '@/data/attendance'
 import { makeLateLog, makeRegularisations } from '@/lib/attendance'
 import { STAFF } from '@/data/people'
 import { now } from '@/lib/clock'
 import { fmtDate } from '@/lib/format'
 import { hhmm, lateBy, mins, placeOf, shiftOf, withLocation, worked, type Fix } from '@/lib/workingDay'
-import type { DayMark, LateMark, Punch, Regularisation, Swap } from '@/data/types'
+import type { DayMark, LateMark, Person, Punch, Regularisation, Swap } from '@/data/types'
+import { OWN_REQUEST, decidesOwn } from '@/lib/permissions'
+
+type Decider = Pick<Person, 'id' | 'n'>
 
 interface TimeclockValue {
   marks: Record<string, DayMark>
@@ -24,10 +28,10 @@ interface TimeclockValue {
   breakStart: (personId: string) => string
   breakEnd: (personId: string) => string
 
-  decideCorrection: (id: string, st: 'approved' | 'rejected') => string
-  decideSwap: (id: string, st: 'approved' | 'rejected') => string
+  decideCorrection: (id: string, st: 'approved' | 'rejected', decider: Decider) => string
+  decideSwap: (id: string, st: 'approved' | 'rejected', decider: Decider) => string
   requestSwap: (from: string, to: string, date: string, why: string) => void
-  decideOvertime: (id: string, st: 'approved' | 'rejected') => string
+  decideOvertime: (id: string, st: 'approved' | 'rejected', decider: Decider) => string
   claimOvertime: (personId: string, d: string, minutes: number, why: string) => void
   setWaived: (id: string, waived: boolean) => void
 }
@@ -42,7 +46,6 @@ const ledger = {
   corrections: makeRegularisations(),
   swaps: SWAPS.map((s) => ({ ...s })) as Swap[],
   late: makeLateLog(),
-  overtime: OT.map((o) => ({ ...o })) as Overtime[],
 }
 
 const log = (p: Punch) => ledger.punches.unshift(p)
@@ -118,18 +121,21 @@ export function TimeclockProvider({ children }: { children: ReactNode }) {
     return `Back — ${m.breakMins} minutes of break so far`
   }, [])
 
-  const decideCorrection = useCallback((id: string, st: 'approved' | 'rejected') => {
+  const decideCorrection = useCallback((id: string, st: 'approved' | 'rejected', decider: Decider) => {
     const r = ledger.corrections.find((x) => x.id === id)
     if (!r) return ''
+    if (decidesOwn([r.who], decider.id)) return OWN_REQUEST
     r.st = st
     changed()
     return st === 'approved' ? `${nameOf(r.who)} — day corrected` : 'Declined'
   }, [])
 
-  const decideSwap = useCallback((id: string, st: 'approved' | 'rejected') => {
+  const decideSwap = useCallback((id: string, st: 'approved' | 'rejected', decider: Decider) => {
     const x = ledger.swaps.find((s) => s.id === id)
     if (!x) return ''
+    if (decidesOwn([x.from, x.to], decider.id)) return OWN_REQUEST
     x.st = st
+    x.by = decider.n
     changed()
     return `Swap ${st}`
   }, [])
@@ -146,27 +152,16 @@ export function TimeclockProvider({ children }: { children: ReactNode }) {
     changed()
   }, [])
 
-  const decideOvertime = useCallback((id: string, st: 'approved' | 'rejected') => {
-    const o = ledger.overtime.find((x) => x.id === id)
-    if (!o) return ''
-    o.st = st
-    changed()
-    return `${nameOf(o.who)} — overtime ${st}`
-  }, [])
+  /* Overtime lives in its own store, which payroll reads, so an approval here is paid. */
+  const overtime = useOvertime()
+
+  const decideOvertime = useCallback(
+    (id: string, st: 'approved' | 'rejected', decider: Decider) => decideOt(id, st, decider),
+    [],
+  )
 
   const claimOvertime = useCallback(
-    (personId: string, d: string, minutes: number, why: string) => {
-      ledger.overtime.unshift({
-        id: `O${9000 + ledger.overtime.length}`,
-        who: personId,
-        d,
-        mins: minutes,
-        why,
-        st: 'pending',
-        by: null,
-      })
-      changed()
-    },
+    (personId: string, d: string, minutes: number, why: string) => claimOt(personId, d, minutes, why),
     [],
   )
 
@@ -179,7 +174,7 @@ export function TimeclockProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<TimeclockValue>(() => {
     const pendingCorrections = ledger.corrections.filter((r) => r.st === 'pending').length
-    const pendingOt = ledger.overtime.filter((o) => o.st === 'pending').length
+    const pendingOt = overtime.filter((o) => o.st === 'pending').length
     const pendingSwaps = ledger.swaps.filter((s) => s.st === 'pending').length
     return {
       marks: ledger.marks,
@@ -187,7 +182,7 @@ export function TimeclockProvider({ children }: { children: ReactNode }) {
       corrections: ledger.corrections,
       swaps: ledger.swaps,
       late: ledger.late,
-      overtime: ledger.overtime,
+      overtime,
       markOf,
       waiting: pendingCorrections + pendingOt + pendingSwaps,
       checkIn,
@@ -204,6 +199,7 @@ export function TimeclockProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     version,
+    overtime,
     markOf,
     checkIn,
     checkOut,

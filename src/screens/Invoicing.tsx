@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react'
-import { Btn, Card, Chip, Empty, Kpi, Kpis, PageHead, Rows, SectionHead } from '@/components/ui'
+import { Banner, Btn, Card, Chip, Empty, Field, Form, FormActions, Kpi, Kpis, PageHead, Rows, SectionHead } from '@/components/ui'
 import { RequireCap } from '@/components/RequireCap'
 import { useUi } from '@/state/ui'
-import { INVOICES, ISTATUS } from '@/data/business'
+import { ISTATUS } from '@/data/business'
+import { useClients } from '@/state/company'
 import { CLIENTS } from '@/data/catalog'
-import { fmtDate, money } from '@/lib/format'
+import { fmtDate, money, r2 } from '@/lib/format'
+import { useGo } from '@/lib/nav'
+import { recordPayment, usePayments } from '@/state/invoices'
 import { csvName, downloadCSV } from '@/lib/csv'
 import {
   EMPTY_RANGE,
@@ -20,25 +23,47 @@ import {
   sameRange,
   sumBy,
   type DateRange,
+  invoicesNow,
 } from '@/lib/invoices'
 import type { Invoice } from '@/data/types'
 
-const COLS = '160px 150px 120px 90px 130px 130px 130px 110px'
+const COLS = '160px 150px 120px 90px 130px 130px 130px 110px 150px'
 
-const bare = (n: number) => money(n).slice(1)
+const bare = (n: number) => money(n).replace('$', '')
 
 function Invoicing() {
   const { toast, openModal, closeModal } = useUi()
   const [client, setClient] = useState('all')
   const [range, setRange] = useState<DateRange>(EMPTY_RANGE)
   const [status, setStatus] = useState('all')
+  /* Statuses are worked out against each client's terms, so an edit to terms re-reads them. */
+  const clients = useClients()
+  /* …and a payment recorded below re-reads them too. */
+  usePayments()
+  const all = invoicesNow(clients)
+  const navigate = useGo()
+
+  const takePayment = (i: Invoice) =>
+    openModal({
+      title: `Record a payment on ${i.id}`,
+      body: (
+        <PaymentForm
+          invoice={i}
+          onCancel={closeModal}
+          onDone={(msg) => {
+            closeModal()
+            toast(msg)
+          }}
+        />
+      ),
+    })
 
   const month = rangeMonth(range)
   const filtered = client !== 'all' || !!range.from || !!range.to || status !== 'all'
 
   const inScope = useMemo(
-    () => INVOICES.filter((i) => (client === 'all' || i.cl === client) && inRange(i, range)),
-    [client, range],
+    () => all.filter((i) => (client === 'all' || i.cl === client) && inRange(i, range)),
+    [all, client, range],
   )
   const rows = useMemo(
     () => inScope.filter((i) => status === 'all' || i.st === status),
@@ -146,7 +171,7 @@ function Invoicing() {
   }
 
   const cellFor = (name: string, m: string) => {
-    const list = INVOICES.filter(
+    const list = all.filter(
       (i) => i.cl === name && i.m === m && (status === 'all' || i.st === status) && inRange(i, range),
     )
     return { amt: sumBy(list, 'amt'), n: list.length }
@@ -154,12 +179,12 @@ function Invoicing() {
 
   const monthTotal = (m: string) =>
     sumBy(
-      INVOICES.filter((i) => i.m === m && (status === 'all' || i.st === status) && inRange(i, range)),
+      all.filter((i) => i.m === m && (status === 'all' || i.st === status) && inRange(i, range)),
       'amt',
     )
 
   const grandTotal = sumBy(
-    INVOICES.filter((i) => (status === 'all' || i.st === status) && inRange(i, range)),
+    all.filter((i) => (status === 'all' || i.st === status) && inRange(i, range)),
     'amt',
   )
 
@@ -419,11 +444,11 @@ function Invoicing() {
 
       <SectionHead>{filtered ? `Invoices — ${scope}` : 'All invoices'}</SectionHead>
       <p className="cnt">
-        <span>ⓘ</span> Showing <b>{rows.length}</b> of <b>{INVOICES.length}</b> invoices
+        <span>ⓘ</span> Showing <b>{rows.length}</b> of <b>{all.length}</b> invoices
       </p>
       <Card>
         <div className="tsc">
-          <div style={{ minWidth: 980 }}>
+          <div style={{ minWidth: 1130 }}>
             <div className="trow h" style={{ gridTemplateColumns: COLS }}>
               <span>Invoice</span>
               <span>Client</span>
@@ -433,6 +458,7 @@ function Invoicing() {
               <span>Paid</span>
               <span>Outstanding</span>
               <span>Status</span>
+              <span />
             </div>
             <div className="tb">
               {rows.length ? (
@@ -443,7 +469,15 @@ function Invoicing() {
                       <div className="s">issued {fmtDate(i.issued)}</div>
                     </div>
                     <div className="cell">
-                      <div className="v">{i.cl}</div>
+                      <div className="v">
+                        <button
+                          type="button"
+                          className="lnk"
+                          onClick={() => navigate({ to: '/clients/$clientCode', params: { clientCode: i.cl } })}
+                        >
+                          {i.cl}
+                        </button>
+                      </div>
                       <div className="s">{i.code}</div>
                     </div>
                     <div className="cell">
@@ -467,6 +501,13 @@ function Invoicing() {
                     </div>
                     <div className="cell">
                       <Chip kind={ISTATUS[i.st][1]}>{ISTATUS[i.st][0]}</Chip>
+                    </div>
+                    <div className="cell">
+                      {balance(i) > 0 ? (
+                        <Btn small variant="ghost" onClick={() => takePayment(i)}>
+                          Record payment
+                        </Btn>
+                      ) : null}
                     </div>
                   </div>
                 ))
@@ -516,5 +557,61 @@ export default function InvoicingRoute() {
     <RequireCap cap="pricing">
       <Invoicing />
     </RequireCap>
+  )
+}
+
+/* A payment against one invoice: the amount, prefilled with what is owed. */
+function PaymentForm({
+  invoice,
+  onCancel,
+  onDone,
+}: {
+  invoice: Invoice
+  onCancel: () => void
+  onDone: (message: string) => void
+}) {
+  const [amount, setAmount] = useState(balance(invoice).toFixed(2))
+  const [error, setError] = useState<string | null>(null)
+
+  const submit = () => {
+    const n = parseFloat(amount)
+    const refused = recordPayment(invoice.id, n)
+    if (refused) return setError(refused)
+    const left = r2(balance(invoice) - n)
+    onDone(left > 0 ? `${money(n)} recorded — ${money(left)} still owed on ${invoice.id}` : `${invoice.id} is paid in full`)
+  }
+
+  return (
+    <>
+      <p style={{ fontSize: 'var(--t-body)' }}>
+        {invoice.cl} · {invoice.m} · {money(balance(invoice))} owed of {money(invoice.amt)}.
+      </p>
+      <Form>
+        <Field label="Amount received" hint="Held for this session until the server accepts writes.">
+          <input
+            className="inp mono"
+            type="number"
+            step="0.01"
+            min="0"
+            value={amount}
+            onChange={(e) => {
+              setAmount(e.target.value)
+              setError(null)
+            }}
+          />
+        </Field>
+      </Form>
+      {error ? (
+        <Banner kind="d" icon="⚑" style={{ margin: '12px 0 0' }}>
+          {error}
+        </Banner>
+      ) : null}
+      <FormActions>
+        <Btn variant="ghost" onClick={onCancel}>
+          Cancel
+        </Btn>
+        <Btn onClick={submit}>Record</Btn>
+      </FormActions>
+    </>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGo } from '@/lib/nav'
+import { board } from '@/lib/engine'
 import {
   Banner,
   BarRow,
@@ -338,6 +339,8 @@ export default function MyPerformance() {
       ).slice(0, 4)
     : []
 
+  const today = board().work[me.id] ?? { done: 0, pend: 0 }
+
   return (
     <>
       <PageHead
@@ -358,6 +361,20 @@ export default function MyPerformance() {
       />
 
       <Kpis>
+        {/* Today against target, which a production seat measures its day by — the
+            figures beside it are quality over the range. */}
+        <Kpi
+          title="Today"
+          value={
+            <span className={today.done >= me.cap ? 'ok' : undefined}>
+              {today.done} of {me.cap}
+            </span>
+          }
+          detail={today.pend ? `stages done · ${today.pend} still in your queue` : 'stages done · queue clear'}
+          chevron
+          hint="Your queue"
+          onClick={() => navigate({ to: '/mywork' })}
+        />
         <Kpi
           title="Your score"
           value={

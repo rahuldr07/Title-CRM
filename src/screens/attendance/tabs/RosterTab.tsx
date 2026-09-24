@@ -4,7 +4,7 @@ import { HOLIDAYS } from '@/data/people'
 import { shiftOf } from '@/lib/workingDay'
 import { fmtDate, pad } from '@/lib/format'
 import type { Person } from '@/data/types'
-import { onLeaveOn } from '../onLeave'
+import { onLeaveOn } from '@/lib/leave'
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 

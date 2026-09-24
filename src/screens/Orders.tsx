@@ -2,11 +2,11 @@ import { useEffect, useMemo } from 'react'
 import { useSearch } from '@tanstack/react-router'
 import { useGo } from '@/lib/nav'
 import { Avatar, Banner, Btn, Due, PageHead } from '@/components/ui'
-import { DataTable, type DataRow } from '@/components/DataTable'
+import { DataTable, type DataRow, type SelectFilter } from '@/components/DataTable'
 import { useSession } from '@/state/session'
 import { useUi } from '@/state/ui'
 import { rememberOrdersView, type OrdersView } from '@/state/ordersView'
-import { ORDERS } from '@/data/production'
+import { useOrders } from '@/state/orders'
 import { STAGES, STATUS } from '@/data/org'
 import { STAFF } from '@/data/people'
 import { SOON_HOURS, TZ, fmtDT, fmtDate, iso, orderChipKind, orderState, parseIso, type OrderState } from '@/lib/format'
@@ -59,7 +59,8 @@ export default function Orders() {
   const mayReport = !reportsNeed || can(reportsNeed)
   const mayCreate = can('all')
 
-  const scope = can('all') ? ORDERS : ORDERS.filter((o) => Object.values(o.a).includes(me.id))
+  const orders = useOrders()
+  const scope = can('all') ? orders : orders.filter((o) => Object.values(o.a).includes(me.id))
 
   const base = useMemo(
     () =>
@@ -74,13 +75,19 @@ export default function Orders() {
     [scope, staff, dept, product, client, dueDate],
   )
 
-  const inState = (k: OrderState) => base.filter((o) => orderState(o) === k).length
+  /* An open order the planner already knows cannot make its promise is at risk,
+     not on track — "On track" counted these while their own rows said "short 3h
+     for the stages left". Together with Past due and Due soon this answers
+     "will today's work go out on time?". */
+  const stateOf = (o: (typeof base)[number]): OrderState | 'risk' =>
+    orderState(o) === 'open' && orderAtRisk(o) ? 'risk' : orderState(o)
+  const inState = (k: OrderState | 'risk') => base.filter((o) => stateOf(o) === k).length
 
   const rows: DataRow[] = base.map((o) => {
     const plan = orderPlan(o)
     return {
       id: o.id,
-      k: orderState(o),
+      k: stateOf(o),
       onClick: () => navigate({ to: '/orders/$orderId', params: { orderId: o.id } }),
       search: `${o.id} ${o.prop} ${o.cl} ${o.co} ${o.st} ${o.pr}`,
       c: [
@@ -155,7 +162,7 @@ export default function Orders() {
   const withFee = can('pricing')
   const exportOrders = () => {
     const out = downloadCSV(csvName('orders'), [
-      ['Order', 'Client', 'Product', 'Property', 'County', 'State', 'Stage', 'Due', 'Received', ...(withFee ? ['Fee'] : []), ...STAGES],
+      ['Order', 'Client', 'Product', 'Property', 'County', 'State', 'Stage', `Due (${TZ})`, `Received (${TZ})`, ...(withFee ? ['Fee'] : []), ...STAGES],
       ...base.map((o) => [
         o.id,
         o.cl,
@@ -172,6 +179,35 @@ export default function Orders() {
     ])
     toast(`${out.name} — ${out.rows.length - 1} rows`)
   }
+
+  /* Staff see only their own orders, so department and staff filters mean nothing to them. */
+  const peopleFilters: SelectFilter[] = can('all')
+    ? [
+        {
+          label: 'Department',
+          value: dept,
+          onChange: (v) =>
+            setView({
+              dept: v,
+              ...(v !== 'all' && staff !== 'all' && !STAFF.find((s) => s.id === staff)?.dep.includes(v)
+                ? { staff: 'all' }
+                : {}),
+            }),
+          options: allFirst('All departments', [...STAGES]),
+        },
+        {
+          label: 'Staff',
+          value: staff,
+          onChange: setStaff,
+          options: [
+            ['all', 'All staff'],
+            ...STAFF.filter((s) => s.dep.length && (dept === 'all' || s.dep.includes(dept))).map(
+              (s) => [s.id, s.n] as [string, string],
+            ),
+          ],
+        },
+      ]
+    : []
 
   return (
     <>
@@ -234,6 +270,7 @@ export default function Orders() {
           { key: 'all', label: 'All', count: base.length },
           { key: 'late', label: 'Past due', count: inState('late'), urgent: true },
           { key: 'soon', label: `Due < ${SOON_HOURS}h`, count: inState('soon'), urgent: true },
+          { key: 'risk', label: 'At risk', count: inState('risk'), urgent: true },
           { key: 'open', label: 'On track', count: inState('open') },
           { key: 'done', label: 'Delivered', count: inState('done') },
         ]}
@@ -242,37 +279,15 @@ export default function Orders() {
             label: 'Product',
             value: product,
             onChange: setProduct,
-            options: allFirst('All products', uniq(ORDERS.map((o) => o.pr))),
+            options: allFirst('All products', uniq(orders.map((o) => o.pr))),
           },
           {
             label: 'Client',
             value: client,
             onChange: setClient,
-            options: allFirst('All clients', uniq(ORDERS.map((o) => o.cl))),
+            options: allFirst('All clients', uniq(orders.map((o) => o.cl))),
           },
-          {
-            label: 'Department',
-            value: dept,
-            onChange: (v) =>
-              setView({
-                dept: v,
-                ...(v !== 'all' && staff !== 'all' && !STAFF.find((s) => s.id === staff)?.dep.includes(v)
-                  ? { staff: 'all' }
-                  : {}),
-              }),
-            options: allFirst('All departments', [...STAGES]),
-          },
-          {
-            label: 'Staff',
-            value: staff,
-            onChange: setStaff,
-            options: [
-              ['all', 'All staff'],
-              ...STAFF.filter((s) => s.dep.length && (dept === 'all' || s.dep.includes(dept))).map(
-                (s) => [s.id, s.n] as [string, string],
-              ),
-            ],
-          },
+          ...peopleFilters,
         ]}
         dateFilter={{ label: 'Due date', value: dueDate, onChange: setDueDate }}
         cols={[
@@ -281,7 +296,9 @@ export default function Orders() {
           { l: 'Property', w: 190, f: 1.4 },
           { l: 'Stage', w: 120 },
           { l: `Due (${TZ})`, w: 180 },
-          { l: 'Search · SQ · Typ · TQC · Doc · RTS', w: 190 },
+          /* Six dots, one a stage in order; each names its stage and owner. The old
+             header spelled them as codes nobody had been told. */
+          { l: 'Stage owners, Search → RTS', w: 190 },
         ]}
         rows={rows}
         numbered

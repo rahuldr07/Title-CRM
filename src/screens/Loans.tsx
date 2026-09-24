@@ -109,9 +109,11 @@ function Loans() {
         sub="Recovery happens inside the payroll run — approve here, deduct automatically, close at zero."
         actions={
           <>
-            <Btn variant="ghost" onClick={exportLoans}>
-              ↓ Export CSV
-            </Btn>
+            {canAll ? (
+              <Btn variant="ghost" onClick={exportLoans}>
+                ↓ Export CSV
+              </Btn>
+            ) : null}
             <Btn onClick={() => go({ to: '/loans/new' })}>+ New request</Btn>
           </>
         }

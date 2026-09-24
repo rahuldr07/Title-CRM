@@ -1,5 +1,7 @@
 import { useCallback } from 'react'
 import { useNavigate, type NavigateOptions, type RegisteredRouter } from '@tanstack/react-router'
+import { useSession } from '@/state/session'
+import { routeNeeds } from '@/lib/permissions'
 
 export type Go = <
   TRouter extends RegisteredRouter = RegisteredRouter,
@@ -21,4 +23,12 @@ export function useGo(): Go {
     },
     [navigate],
   )
+}
+
+/* Whether the signed-in person can open a route. A link to a screen they cannot
+   open lands on "You do not have access", so such links render as plain text. */
+export function useMayOpen(route: string): boolean {
+  const { can } = useSession()
+  const need = routeNeeds(route)
+  return !need || can(need)
 }

@@ -9,7 +9,12 @@ import { exportEverything } from './exportAll'
 const TIMEZONES = ['India Standard Time', 'Eastern', 'Central']
 
 export function CompanyTab({ plan }: { plan: string }) {
-  const { profile } = useCompany()
+  const { profile, staff } = useCompany()
+  /* The plan names its seats; a roster past them is worth saying on the one
+     field that shows the plan, rather than finding out at renewal. */
+  const seats = Number(/(\d+)\s*seats?/i.exec(plan)?.[1] ?? 0)
+  const active = staff.filter((p) => p.active !== false).length
+  const over = seats ? active - seats : 0
   const { openModal, closeModal, toast } = useUi()
   const [fmt, setFmt] = useState<DateFormat>(getDateFormat)
 
@@ -91,6 +96,11 @@ export function CompanyTab({ plan }: { plan: string }) {
           <div className="fld">
             <label>Plan</label>
             <div className="ro">{plan}</div>
+            {over > 0 ? (
+              <div className="hint bad">
+                {active} active people on a {seats}-seat plan — {over} over.
+              </div>
+            ) : null}
           </div>
         </div>
       </Card>
@@ -183,7 +193,7 @@ function CloseWorkspace({
               return
             }
             setError(
-              'Closing a workspace needs the server — this build has no way to revoke access, and pretending otherwise would be the one thing this dialog must not do.',
+              'Closing a workspace needs the server, which is not connected yet — access cannot be revoked from here, and this dialog will not pretend it was.',
             )
           }}
         >

@@ -53,8 +53,16 @@ export const hrs = (h: number) => new Date(now().getTime() + h * 3600000)
 
 export const dstamp = () => `${now().getFullYear()}-${pad(now().getMonth() + 1)}-${pad(now().getDate())}`
 
+/* The sign goes in front of the currency as a true minus (U+2212). "$-12.50"
+   has a hyphen a line may break after, which split figures on a phone. */
+export const signed = (n: number, sym: string, digits: string) => (n < 0 ? '\u2212' : '') + sym + digits
+
 export const money = (n: number) =>
-  '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  signed(
+    n,
+    '$',
+    Math.abs(Number(n)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+  )
 
 export const initials = (n: string) =>
   n
@@ -101,3 +109,19 @@ export const orderChipKind = (o: Dueable): ChipKind => ORDER_CHIP[orderState(o)]
 export const daysSince = (d: Date) => Math.floor((now().getTime() - d.getTime()) / 86400000)
 
 export const pct = (n: number, digits = 0) => `${n.toFixed(digits)}%`
+
+/* A county address as something a searcher can click. Addresses are stored
+   without a scheme and are editable, so only a web address becomes a link:
+   an http(s) one as given, a bare host over https, anything else not at all. */
+export function webHref(address: string): string | null {
+  const u = address.trim()
+  if (!u) return null
+  if (/^https?:\/\//i.test(u)) return u
+  if (/^[a-z][a-z0-9+.-]*:/i.test(u)) return null
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(u) ? `https://${u}` : null
+}
+
+/* Alaska records by recording district and Louisiana by parish; "Palmer County,
+   AK" named a place that does not exist. */
+export const countyName = (county: string, state: string): string =>
+  state === 'AK' ? `${county} Recording District` : state === 'LA' ? `${county} Parish` : `${county} County`

@@ -10,6 +10,7 @@ import { ExceptionsTab } from './assignment/ExceptionsTab'
 import { CapacityTab } from './assignment/CapacityTab'
 import { RulesTab } from './assignment/RulesTab'
 import { LevelsTab } from './assignment/LevelsTab'
+import { openExceptions, useOrderState } from '@/state/orders'
 
 export type AssignTab = 'Live' | 'Exceptions' | 'Capacity' | 'Rules' | 'Levels'
 
@@ -26,7 +27,8 @@ function Assignment() {
   const { coverageGaps } = useLevels()
   const { board, rules, rerun } = useRules()
 
-  const exc = board.run.exc.filter((e) => e.today)
+  useOrderState()
+  const exc = openExceptions()
   const gaps = coverageGaps().length
 
   return (

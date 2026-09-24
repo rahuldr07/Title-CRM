@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { countyName } from '@/lib/format'
 import { Banner, Btn, FormActions, Label } from '@/components/ui'
 import { BADSTATES } from '@/data/catalog'
 import { LSTATE, days } from '@/lib/derived'
@@ -60,7 +61,7 @@ export function CountyEdit({
     return (
       <>
         <p style={{ fontSize: 'var(--t-body)' }}>
-          Removing <b>{county.n} County, {county.st}</b> takes it off the coverage record.{' '}
+          Removing <b>{countyName(county.n, county.st)}, {county.st}</b> takes it off the coverage record.{' '}
           {held
             ? `The ${held} link${held === 1 ? '' : 's'} on file ${held === 1 ? 'goes' : 'go'} with it.`
             : 'It has no links on file, so nothing else is lost.'}

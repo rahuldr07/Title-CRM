@@ -20,6 +20,8 @@ import { useUi } from '@/state/ui'
 import { STAFF } from '@/data/people'
 import { LSTATE, brokenLinks, days, linkStats, nextLinkCheck, type FlatLink } from '@/lib/derived'
 import { fmtDT, fmtDate, TZ } from '@/lib/format'
+import { WebLink } from '@/components/WebLink'
+import { useSession } from '@/state/session'
 import { now } from '@/lib/clock'
 import { runLinkCheck, setCheckEvery, setCheckNotify, useCoverage } from '@/state/counties'
 import { FixLink } from '@/components/FixLink'
@@ -44,6 +46,10 @@ const CAUSES: [LinkStatus, string][] = [
 ]
 
 function LinkMonitor() {
+  /* Fixing a link and running the check are for whoever looks after the counties;
+     everyone can open the addresses. */
+  const { can } = useSession()
+  const mayEdit = can('all')
   const navigate = useGo()
   const { openModal, closeModal, toast } = useUi()
   const { counties, check } = useCoverage()
@@ -101,7 +107,7 @@ function LinkMonitor() {
             <Btn variant="ghost" onClick={() => toCoverage()}>
               County coverage
             </Btn>
-            <Btn onClick={runNow}>Run the check now</Btn>
+            {mayEdit ? <Btn onClick={runNow}>Run the check now</Btn> : null}
           </>
         }
       />
@@ -218,7 +224,7 @@ function LinkMonitor() {
                             {x.l.err || '—'}
                           </div>
                           <div className="s mono" style={{ fontSize: 'var(--t-label)' }}>
-                            {x.l.u || 'no address'}
+                            {x.l.u ? <WebLink address={x.l.u} /> : 'no address'}
                           </div>
                         </div>
                         <div className="cell">
@@ -229,14 +235,16 @@ function LinkMonitor() {
                           </div>
                         </div>
                         <div className="cell">
-                          <Btn
-                            variant="ghost"
-                            small
-                            aria-label={`Fix the ${x.lbl} link for ${x.c.n}`}
-                            onClick={() => fix(x)}
-                          >
-                            Fix
-                          </Btn>
+                          {mayEdit ? (
+                            <Btn
+                              variant="ghost"
+                              small
+                              aria-label={`Fix the ${x.lbl} link for ${x.c.n}`}
+                              onClick={() => fix(x)}
+                            >
+                              Fix
+                            </Btn>
+                          ) : null}
                         </div>
                       </div>
                     ))}

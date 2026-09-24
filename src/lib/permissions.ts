@@ -1,12 +1,18 @@
-import { ROLELIST, NAVPERM } from '@/data/org'
+import { NAVPERM } from '@/data/org'
+import { currentRoles } from '@/state/company'
 import { STAFF } from '@/data/people'
 import type { Person, Role } from '@/data/types'
 import { NAV, type NavGroup } from '@/app/nav'
 
 const NO_ROLE: Role = { id: '', n: '—', desc: '', p: [] }
 
-export const roleOf = (roleId: string): Role =>
-  ROLELIST.find((r) => r.id === roleId) ?? ROLELIST[0] ?? NO_ROLE
+/* The roles as the company has them, edits included. This read the bundled list,
+   so a role changed on the permissions screen changed the matrix and nothing that
+   `can()` answered. */
+export const roleOf = (roleId: string): Role => {
+  const roles = currentRoles()
+  return roles.find((r) => r.id === roleId) ?? roles[0] ?? NO_ROLE
+}
 
 export const roleName = (roleId: string) => roleOf(roleId).n
 
@@ -42,3 +48,11 @@ export function mayVisit(person: Person | undefined, route: string): boolean {
   const need = routeNeeds(route)
   return !need || can(person, need)
 }
+
+/* Nobody decides a request they are party to — overtime, an attendance
+   correction, a shift swap, leave. Each reaches a payslip, so this is the
+   self-review principle applied to pay and time. */
+export const decidesOwn = (parties: readonly string[], deciderId: string): boolean =>
+  parties.includes(deciderId)
+
+export const OWN_REQUEST = 'That request is yours, so someone else has to decide it.'

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- The brand glyph ◧: a square, its left half filled. -->
+  <rect x="4" y="4" width="24" height="24" rx="5" fill="#ffffff" stroke="#4f46e5" stroke-width="3"/>
+  <path d="M9 5.5h7v21H9a3.5 3.5 0 0 1-3.5-3.5V9A3.5 3.5 0 0 1 9 5.5z" fill="#4f46e5"/>
+</svg>

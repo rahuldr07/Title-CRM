@@ -4,8 +4,8 @@ import { Assumption, Banner, Btn, Card, CardHead, FormActions, Label, SecHead, S
 import { useUi } from '@/state/ui'
 import { ASSIGN_STAGES } from '@/data/org'
 import { CLIENTS, PRODUCTS } from '@/data/catalog'
-import { ORDERS } from '@/data/production'
-import { budgetOK, curStageOf, hh, isDefaultRule, orderPlan, shareTotal } from '@/lib/sla'
+import { allOrders } from '@/state/orders'
+import { budgetOK, curStageOf, hh, isDefaultRule, orderPlan, shareTotal, stageWindows } from '@/lib/sla'
 import { Due } from '@/components/ui'
 import { r2 } from '@/lib/format'
 import {
@@ -131,10 +131,10 @@ function ClientPromise() {
         </Banner>
       ) : null}
 
-      <Assumption title="These hours are placeholders">
-        I don’t have your real commitments, so every row below is a guess.{' '}
-        <b>Replace them with what you’ve actually promised each client</b> — the whole due-date
-        system is only as honest as this table.
+      <Assumption title="These hours are defaults">
+        They are not your client commitments yet.{' '}
+        <b>Replace them with what you have promised each client</b> — every due date is only as
+        right as this table.
       </Assumption>
 
       <Card>
@@ -298,17 +298,14 @@ function StageBudgets() {
   const tot = shareTotal(sh)
   const ok = budgetOK(sh)
   const diff = r2(100 - tot)
-  const win = 24 * (1 - budget.buffer / 100)
-
-  const cps = ASSIGN_STAGES.reduce<{ st: string; h: number; c: number }[]>((acc, st) => {
-    const h = (win * (sh[st] ?? 0)) / 100
-    acc.push({ st, h, c: (acc[acc.length - 1]?.c ?? 0) + h })
-    return acc
-  }, [])
+  /* A 24-hour order, as the worked example. The formula is `stageWindows`, the
+     one `checkpoints` uses, so this screen and the planner cannot disagree. */
+  const cps = stageWindows(24, budget.buffer, sh)
+  const sliceOf = (st: string) => cps.find((c) => c.stage === st)?.hours ?? 0
 
   const spare = PRODUCTS.map((p) => p.id).filter((id) => !budget.over.some((o) => o.pr === id))
 
-  const risky = ORDERS.filter((o) => !o.done)
+  const risky = allOrders().filter((o) => !o.done)
     .map((o) => ({ o, p: orderPlan(o) }))
     .filter((x) => x.p.behind || x.p.doomed)
 
@@ -318,11 +315,11 @@ function StageBudgets() {
     <>
       <SecHead sub="Where due dates come from. Change a number here and every new order moves with it." />
 
-      <Assumption title="The 50/11/25/10/4 split is my guess, not your data">
-        I picked these shares from how the work reads, not from timings.{' '}
-        <b>Take a week of finished orders and measure how long each department actually held them</b>{' '}
-        — the median is your split. Until then every checkpoint below is directionally right and
-        numerically invented.
+      <Assumption title="The 50/11/25/10/4 split is a default, not a measurement">
+        The shares follow how the work reads, not how long it takes.{' '}
+        <b>Take a week of finished orders and measure how long each department held them</b> — the
+        median is your split. Until then every checkpoint below is the right shape but not yet your
+        numbers.
       </Assumption>
 
       <Banner
@@ -393,7 +390,7 @@ function StageBudgets() {
                 </span>
               </div>
               <span className="mono gr" style={{ fontSize: 'var(--t-label)', textAlign: 'right' }}>
-                {hh((win * (sh[st] ?? 0)) / 100)}
+                {hh(sliceOf(st))}
               </span>
             </div>
           ))}
@@ -508,12 +505,12 @@ function StageBudgets() {
               </thead>
               <tbody>
                 {cps.map((c) => (
-                  <tr key={c.st}>
+                  <tr key={c.stage}>
                     <td>
-                      <b>{c.st}</b>
+                      <b>{c.stage}</b>
                     </td>
-                    <td className="n mono">{hh(c.h)}</td>
-                    <td className="tot">{hh(c.c)}</td>
+                    <td className="n mono">{hh(c.hours)}</td>
+                    <td className="tot">{hh(c.by)}</td>
                   </tr>
                 ))}
                 <tr>
@@ -542,11 +539,7 @@ function StageBudgets() {
               </thead>
               <tbody>
                 {[4, 24, 48, 72].map((H) => {
-                  const w = H * (1 - budget.buffer / 100)
-                  const run = ASSIGN_STAGES.reduce<number[]>((acc, st) => {
-                    acc.push((acc[acc.length - 1] ?? 0) + (w * (sh[st] ?? 0)) / 100)
-                    return acc
-                  }, [])
+                  const run = stageWindows(H, budget.buffer, sh).map((c) => c.by)
                   return (
                     <tr key={H}>
                       <td>
@@ -572,7 +565,7 @@ function StageBudgets() {
           <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 10 }}>
             Because the split is a percentage, a 4-hour rush is governed by the same setting as a
             72-hour full search. Watch the rush row: {ASSIGN_STAGES[1]} gets{' '}
-            {hh((4 * (1 - budget.buffer / 100) * (sh[ASSIGN_STAGES[1]] ?? 0)) / 100)}. If that is
+            {hh(stageWindows(4, budget.buffer, sh)[1]?.hours ?? 0)}. If that is
             unrealistic, a rush needs its own split rather than a smaller slice of the same one.
           </p>
         </Card>

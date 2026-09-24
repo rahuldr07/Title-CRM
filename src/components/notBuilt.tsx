@@ -7,11 +7,11 @@ export function useNotBuilt() {
 
   return (what: string, needs: string, csv?: () => CsvResult) =>
     openModal({
-      title: `${what} is not built here`,
+      title: `${what} is not available yet`,
       body: (
         <>
           <p style={{ fontSize: 'var(--t-body)' }}>
-            It needs <b>{needs}</b>, which this build does not have.
+            It needs <b>{needs}</b>, which is not connected yet.
           </p>
           <p className="gr" style={{ fontSize: 'var(--t-small)' }}>
             {csv

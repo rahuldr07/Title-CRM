@@ -114,7 +114,7 @@ function Recruitment() {
           {next === 'Joined' ? (
             <Banner kind="b" icon="◔" style={{ margin: '12px 0 0' }}>
               Marking someone joined would create their staff record, department and salary.{' '}
-              <b>That step is not built yet</b> — it needs the offer figures, which live outside
+              <b>That step is not available yet</b> — it needs the offer figures, which live outside
               this screen.
             </Banner>
           ) : null}
@@ -210,8 +210,8 @@ function Recruitment() {
           </p>
         )}
         <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 12 }}>
-          Click anyone to move them a stage on. A candidate at Joined becomes a staff record — that
-          is the only way people get into the system, so nobody exists without a hiring trail.
+          Click anyone to move them a stage on. Marking someone joined does not create their staff
+          record yet — add them under Company → Staff once the offer is signed.
         </p>
       </Card>
 

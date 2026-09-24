@@ -4,7 +4,7 @@ import { Btn, Chip, Due, Empty, Kpi, Kpis, PageHead, Row, Rows, SectionHead } fr
 import { RequireCap } from '@/components/RequireCap'
 import { useSession } from '@/state/session'
 import { useUi } from '@/state/ui'
-import { ORDERS } from '@/data/production'
+import { openExceptions, useOrders } from '@/state/orders'
 import { STAGES, STATUS } from '@/data/org'
 import { TZ, fmtDate, orderChipKind } from '@/lib/format'
 import { now } from '@/lib/clock'
@@ -18,7 +18,8 @@ import { SkeletonValue } from '@/components/async'
 import { TeamWishes } from '@/components/Wishes'
 
 const st = (k: string) => STATUS[k]?.[0] ?? k
-const stColor = (k: string) => STATUS[k]?.[1] ?? '#94A3B8'
+/* A status nobody gave a colour takes the ink token, so it follows dark mode. */
+const stColor = (k: string) => STATUS[k]?.[1] ?? 'var(--ink)'
 
 const COLS = '40px 130px 110px 1.4fr 150px 190px 130px'
 /* The fixed columns, six 13px gaps and the row padding come to 864px, so the
@@ -96,19 +97,21 @@ function Dashboard() {
   const navigate = useGo()
   const [pipe, setPipe] = useState<string | null>(null)
 
+  const orders = useOrders()
   const overdue = pastDue()
   const atRisk = atRiskCount()
   const open = openCount()
 
-  const counts = stageCounts(ORDERS)
-  const shown = pipe ? ORDERS.filter((o) => o.stt === pipe) : overdue
+  const counts = stageCounts(orders)
+  const shown = pipe ? orders.filter((o) => o.stt === pipe) : overdue
 
   const history = useDeliveries()
   const ot = useMemo(() => onTime30(history.data ?? []), [history.data])
   const otLoading = history.isPending
   const wishes = celebrationsWithin(STAFF, now(), 7)
 
-  const unassigned = ORDERS.filter((o) => !o.done && Object.values(o.a).every((x) => !x)).length
+  /* The same count Assignment shows, which a hand assignment lowers. */
+  const unassigned = openExceptions().length
   const { run: RUN } = board()
   const openOnTime = () =>
     openModal({
@@ -139,7 +142,9 @@ function Dashboard() {
 
   const delivered = RUN.today.filter((o) => !curStage(o)).length
   const moving = RUN.today.filter((o) => curStage(o)).length
-  const unplaced = RUN.exc.filter((e) => e.today).length
+  const unplaced = unassigned
+  const today = new Set(RUN.today.map((o) => o.id))
+  const earlier = orders.filter((o) => !o.done && !today.has(o.id)).length
 
   return (
     <>
@@ -183,7 +188,7 @@ function Dashboard() {
           title="Open orders"
           icon="☰"
           value={open}
-          detail={`across ${STAGES.length} stages`}
+          detail={earlier ? `${open - earlier} from today, ${earlier} from earlier days` : `across ${STAGES.length} stages`}
           chevron
           hint="Everything still moving"
           onClick={() => navigate({ to: '/orders', search: { pill: 'all' } })}
@@ -340,7 +345,7 @@ function Dashboard() {
           title="Still moving"
           value={<span className="warn">{moving}</span>}
           tone="warn"
-          detail={<>somewhere in the pipeline{clickToSee}</>}
+          detail={<>of today’s {RUN.today.length}, still in the pipeline{clickToSee}</>}
           hint="Open the detail"
           onClick={() => navigate({ to: '/reports', search: { tab: 'Received', focus: 'wip' } })}
         />

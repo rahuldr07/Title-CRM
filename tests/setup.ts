@@ -11,6 +11,9 @@ import { resetBox } from '@/state/petty'
 import { resetOrders } from '@/state/orders'
 import { resetHiringBoard } from '@/state/hiring'
 import { resetLoans } from '@/state/loans'
+import { resetRuns } from '@/state/payruns'
+import { resetOvertime } from '@/state/overtime'
+import { resetPayments } from '@/state/invoices'
 
 /**
  * Puts every piece of module-level state back between tests.
@@ -43,6 +46,9 @@ afterEach(() => {
   resetOrders()
   resetHiringBoard()
   resetLoans()
+  resetRuns()
+  resetOvertime()
+  resetPayments()
 
   /* Not a store — the memoised assignment run. Dropped last, because it is
      computed from the roster and the rules the stores above have just restored,

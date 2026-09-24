@@ -2,7 +2,8 @@ import { Btn, Card, Kpi, Kpis, Rows, SectionHead } from '@/components/ui'
 import { useUi } from '@/state/ui'
 import { useTimeclock } from '@/state/timeclock'
 import { shiftOf } from '@/lib/workingDay'
-import { whoName } from '@/lib/permissions'
+import { decidesOwn, whoName } from '@/lib/permissions'
+import { useSession } from '@/state/session'
 import { fmtDate, initials, pad } from '@/lib/format'
 import type { Person } from '@/data/types'
 
@@ -22,6 +23,7 @@ export function TodayTab({
   openPerson: (id: string) => void
 }) {
   const { toast } = useUi()
+  const { me } = useSession()
   const clock = useTimeclock()
 
   const groups = new Map<string, Person[]>()
@@ -37,9 +39,9 @@ export function TodayTab({
   const punchesToday = clock.punches.filter((l) => l.d === fmtDate(today)).length
 
   const decide =
-    (fn: (id: string, st: 'approved' | 'rejected') => string, id: string, st: 'approved' | 'rejected') =>
-    () => {
-      const msg = fn(id, st)
+    (fn: (id: string, st: 'approved' | 'rejected', decider: Person) => string, id: string) =>
+    (st: 'approved' | 'rejected') => {
+      const msg = fn(id, st, me)
       if (msg) toast(msg)
     }
 
@@ -164,14 +166,7 @@ export function TodayTab({
                       automatic.
                     </div>
                   </span>
-                  <span style={{ display: 'flex', gap: 6 }}>
-                    <Btn variant="ghost" small onClick={decide(clock.decideCorrection, r.id, 'rejected')}>
-                      Decline
-                    </Btn>
-                    <Btn small onClick={decide(clock.decideCorrection, r.id, 'approved')}>
-                      Approve
-                    </Btn>
-                  </span>
+                  <Decide parties={[r.who]} onDecide={decide(clock.decideCorrection, r.id)} />
                 </div>
               ))}
             </Rows>
@@ -198,14 +193,7 @@ export function TodayTab({
                       Approving this adds the hours to their next payslip at the ordinary rate.
                     </div>
                   </span>
-                  <span style={{ display: 'flex', gap: 6 }}>
-                    <Btn variant="ghost" small onClick={decide(clock.decideOvertime, o.id, 'rejected')}>
-                      Decline
-                    </Btn>
-                    <Btn small onClick={decide(clock.decideOvertime, o.id, 'approved')}>
-                      Approve
-                    </Btn>
-                  </span>
+                  <Decide parties={[o.who]} onDecide={decide(clock.decideOvertime, o.id)} />
                 </div>
               ))}
             </Rows>
@@ -233,14 +221,7 @@ export function TodayTab({
                       day.
                     </div>
                   </span>
-                  <span style={{ display: 'flex', gap: 6 }}>
-                    <Btn variant="ghost" small onClick={decide(clock.decideSwap, x.id, 'rejected')}>
-                      Decline
-                    </Btn>
-                    <Btn small onClick={decide(clock.decideSwap, x.id, 'approved')}>
-                      Approve
-                    </Btn>
-                  </span>
+                  <Decide parties={[x.from, x.to]} onDecide={decide(clock.decideSwap, x.id)} />
                 </div>
               ))}
             </Rows>
@@ -255,5 +236,24 @@ export function TodayTab({
         </p>
       )}
     </>
+  )
+}
+
+/* A request's two buttons — or, to someone who is party to it, who decides instead.
+   Nobody decides their own overtime, correction, or swap; each reaches a payslip. */
+function Decide({ parties, onDecide }: { parties: string[]; onDecide: (st: 'approved' | 'rejected') => void }) {
+  const { me } = useSession()
+  if (decidesOwn(parties, me.id)) {
+    return <span style={{ fontSize: 'var(--t-label)' }}>Yours — someone else decides</span>
+  }
+  return (
+    <span style={{ display: 'flex', gap: 6 }}>
+      <Btn variant="ghost" small onClick={() => onDecide('rejected')}>
+        Decline
+      </Btn>
+      <Btn small onClick={() => onDecide('approved')}>
+        Approve
+      </Btn>
+    </span>
   )
 }

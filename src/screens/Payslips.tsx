@@ -17,7 +17,8 @@ import {
 import { ErrorBoundary } from '@/components/async'
 import { RequireCap } from '@/components/RequireCap'
 import { useUi } from '@/state/ui'
-import { PAYMONTHS, PAYRUNS, RUNSTATE } from '@/data/hrms'
+import { PAYMONTHS, RUNSTATE } from '@/data/hrms'
+import { useRuns, type RunRecord } from '@/state/payruns'
 import type { Person } from '@/data/types'
 import { inr, paidStaff, payTotals, payslipOf } from '@/lib/payroll'
 import { usePayslipDownloads } from './payslips/usePayslipDownloads'
@@ -28,8 +29,8 @@ type Tab = (typeof TABS)[number]
 const MONTH_COLS = '200px 140px 130px 130px 130px 1fr'
 const PERSON_COLS = '170px 130px 130px 130px 110px 1fr'
 
-function latestPublished(): string {
-  const published = PAYMONTHS.filter((m) => PAYRUNS[m]?.published)
+function latestPublished(runs: Record<string, RunRecord>): string {
+  const published = PAYMONTHS.filter((m) => runs[m]?.published)
   return published.length ? published[published.length - 1] : PAYMONTHS[PAYMONTHS.length - 1]
 }
 
@@ -43,13 +44,14 @@ function ThisMonth({
   totals: ReturnType<typeof payTotals>
 }) {
   const navigate = useGo()
+  const runs = useRuns()
   const { openModal, closeModal } = useUi()
   const download = usePayslipDownloads()
   const [only, setOnly] = useState<'all' | 'lop'>('all')
   const [query, setQuery] = useState('')
   const list = useRef<HTMLDivElement>(null)
 
-  const run = PAYRUNS[month]
+  const run = runs[month]
 
   const openPayslip = (personId: string) =>
     navigate({ to: '/payslips/$personId', params: { personId }, search: { m: month } })
@@ -123,7 +125,7 @@ function ThisMonth({
     <>
       <div className="fbar" role="group" aria-label="Month">
         {PAYMONTHS.map((m) => {
-          const r = PAYRUNS[m]
+          const r = runs[m]
           return (
             <button
               key={m}
@@ -331,7 +333,8 @@ function OnePerson({
   const { openModal } = useUi()
   const download = usePayslipDownloads()
 
-  const months = useMemo(() => PAYMONTHS.filter((m) => PAYRUNS[m]?.published), [])
+  const runs = useRuns()
+  const months = useMemo(() => PAYMONTHS.filter((m) => runs[m]?.published), [runs])
   const rows = useMemo(
     () => (who ? months.map((m) => ({ m, s: payslipOf(who, m) })) : []),
     [who, months],
@@ -525,8 +528,10 @@ function OnePerson({
                     style={{ gridTemplateColumns: PERSON_COLS, background: 'var(--tint)' }}
                   >
                     <div className="cell">
+                      {/* The months above can span two financial years, so this is their
+                          total, not a year to date. */}
                       <div className="v" style={{ fontWeight: 700 }}>
-                        Year to date
+                        Total of these months
                       </div>
                     </div>
                     <div className="cell">
@@ -562,13 +567,14 @@ function OnePerson({
 
 function Payslips() {
   const navigate = useGo()
+  const runs = useRuns()
   const download = usePayslipDownloads()
   const search = useSearch({ from: '/payslips' })
 
   const people = useMemo(() => paidStaff(), [])
 
   const tab: Tab = TABS.includes(search.tab as Tab) ? (search.tab as Tab) : 'This month'
-  const month = search.m && PAYMONTHS.includes(search.m) ? search.m : latestPublished()
+  const month = search.m && PAYMONTHS.includes(search.m) ? search.m : latestPublished(runs)
   const who = people.find((p) => p.id === search.p) ?? people[0]
 
   const setView = (next: { tab?: Tab; m?: string; p?: string }) =>
@@ -579,10 +585,10 @@ function Payslips() {
     })
 
   const totals = useMemo(() => payTotals(month), [month])
-  const run = PAYRUNS[month]
+  const run = runs[month]
   const publishedCount = useMemo(
-    () => PAYMONTHS.filter((m) => PAYRUNS[m]?.published).length,
-    [],
+    () => PAYMONTHS.filter((m) => runs[m]?.published).length,
+    [runs],
   )
 
   if (!people.length) {

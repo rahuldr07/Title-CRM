@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react'
+import { cloneElement, isValidElement, useId, type CSSProperties, type ReactNode } from 'react'
 import { useGo } from '@/lib/nav'
 import { dueMeta, initials } from '@/lib/format'
 import type { ChipKind } from '@/data/types'
@@ -290,7 +290,11 @@ export function Kpi({
       </div>
       <div
         className={`v${valueTone ? ' ' + valueTone : ''}`}
-        style={valueSize ? { fontSize: valueSize } : undefined}
+        style={
+          valueSize
+            ? { fontSize: `min(${typeof valueSize === 'number' ? `${valueSize}px` : valueSize}, 13cqi)` }
+            : undefined
+        }
       >
         {value}
       </div>
@@ -490,6 +494,10 @@ export function Form({ children, style }: { children: ReactNode; style?: CSSProp
   )
 }
 
+/* The label names its control and the hint describes it. The label had no
+   `htmlFor`, so every control in a Field was unnamed to a screen reader unless
+   the call site remembered an aria-label; the control's own id is kept if it
+   has one. */
 export function Field({
   label,
   hint,
@@ -499,11 +507,29 @@ export function Field({
   hint?: ReactNode
   children: ReactNode
 }) {
+  const auto = useId()
+  const control =
+    isValidElement<{ id?: string; 'aria-describedby'?: string }>(children) &&
+    typeof children.type === 'string' &&
+    ['input', 'select', 'textarea'].includes(children.type)
+      ? children
+      : null
+  const id = control?.props.id ?? auto
+  const hintId = `${id}-hint`
   return (
     <div className="fld">
-      <label>{label}</label>
-      {children}
-      {hint ? <div className="hint">{hint}</div> : null}
+      <label htmlFor={control ? id : undefined}>{label}</label>
+      {control
+        ? cloneElement(control, {
+            id,
+            ...(hint ? { 'aria-describedby': hintId } : {}),
+          })
+        : children}
+      {hint ? (
+        <div className="hint" id={hintId}>
+          {hint}
+        </div>
+      ) : null}
     </div>
   )
 }

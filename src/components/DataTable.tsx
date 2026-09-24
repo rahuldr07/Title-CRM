@@ -198,14 +198,14 @@ export function DataTable({
                       : {})}
                   >
                     {numbered ? (
-                      <div className="cell">
+                      <div className="cell" data-label="#">
                         <div className="gr mono" style={{ fontSize: 'var(--t-label)' }}>
                           {ri + 1}
                         </div>
                       </div>
                     ) : null}
                     {r.c.map((x, i) => (
-                      <div className="cell" key={i}>
+                      <div className="cell" key={i} data-label={cols[i]?.l}>
                         {x.raw ? (
                           x.raw
                         ) : x.chip ? (

@@ -1,9 +1,28 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Title CRM — the rules that are not local
 
 An implementation of the Claude Design "Title CRM 897". [`README.md`](README.md)
-covers what it is and how to run it. This file covers the four invariants that
+covers what it is and how to run it. This file covers the six invariants that
 hold across files, so nothing in the file you are editing will tell you about
 them.
+
+## Running
+
+```bash
+npm run dev                              # front end on :5173, seed data, no database needed
+npx vitest run tests/rules/sla.test.ts   # one test file
+npx vitest run -t 'self-review'          # tests whose name matches
+```
+
+The API side (`db:push` → `db:rls` → `db:seed` → `npm run server` on :8787, two
+connection strings, and why) is in the README under *Running it*. `tests/db`
+skips itself when `APP_DATABASE_URL` is unset, so a green `npm test` locally may
+not have run the isolation suite — CI runs it against a real Postgres. Test files
+run serially (`fileParallelism: false` in `vitest.config.ts`) because the
+isolation tests share one database.
 
 ## Gates
 
@@ -39,7 +58,7 @@ Everything dated measures against that one instant: every countdown, overdue
 flag, SLA checkpoint, ageing figure and payroll period. It is pinned to
 `SEED_NOW` — Mon 3 Aug 2026, 5:30 PM, the end of the working day the design
 shows (`src/lib/clock.ts`) — which is what makes the figures on screen the
-design's figures, and makes them reproducible in a test. 37 modules under `src/`
+design's figures, and makes them reproducible in a test. 42 modules under `src/`
 read it.
 
 The rule is enforced because it was once only documented. `Payroll.tsx` drifted
@@ -90,7 +109,7 @@ The application runs both ways, and only one of them is wired to the screens.
 - **Seed.** The screens read `src/data/*.ts`, bundled at build time rather than
   fetched. That is why `npm run dev` alone shows all of it with no database, and
   why the numbers are the design's. The one dataset that is not a static import
-  is the 767-row delivery history: `src/data/deliveries.ts:78` pulls
+  is the 767-row delivery history: `src/data/deliveries.ts:33` pulls
   `deliveries.json` in dynamically, so its chunk is requested only by the four
   screens that report on it (`src/lib/useDeliveries.ts`).
 - **Server.** A Hono API mounts six route modules under `/api`
@@ -116,7 +135,7 @@ way to tell which figure came from where (README, *Known scope*;
 `src/data/types.ts` and the database describe the same domain but do not share
 field names — `Order` is `{cl, pr, stt, st, co, prop}` where the `orders` table
 is `{clientId, productId, status, state, county, property}`
-(`src/data/types.ts:233-243`, `server/db/schema.ts:266-284`), and the routes
+(`src/data/types.ts:198`, `server/db/schema.ts:266`), and the routes
 return table rows unmapped (`server/routes/reference.ts:55-59`). So a migrated
 screen needs a mapping, not only a different source.
 
@@ -127,7 +146,7 @@ that is not in this repository — `business`, `catalog`, `hrms`, `org`, `people
 and `production`, each carrying an `AUTO-GENERATED` header, plus the two JSON
 datasets; `.gitattributes` marks them `linguist-generated`. The rest of
 `src/data/` is hand-written: the domain types (`types.ts`), the loaders that
-revive the two JSON datasets (`deliveries.ts`, `quality.ts`), and five smaller
+revive the two JSON datasets (`deliveries.ts`, `quality.ts`), and six smaller
 modules of values.
 
 The field names are the design's own: `n` a name, `k` a key, `st` a status, and
@@ -140,7 +159,7 @@ would put them straight back. For the same reason, a defect fixed in the
 generated output is a defect a regeneration reintroduces:
 `tests/rules/dates.test.ts` exists as the guard against exactly that. eslint
 skips every `src/data/*.ts` and un-ignores only `types.ts`
-(`eslint.config.js:16`), because that one is the hand-maintained domain model.
+(`eslint.config.js:19`), because that one is the hand-maintained domain model.
 
 ## 5. Type sizes come from the scale, and there are two greys
 
@@ -180,6 +199,51 @@ step. The `@font-face` fallbacks carry `ascent-override`/`size-adjust` computed
 from Geist's own head/hhea/OS-2 tables — that, not a preload, is what stops the
 swap from shifting layout. If the fonts are ever replaced, those four numbers
 have to be recomputed from the new files or the overrides become wrong.
+
+## 6. One source per fact, and the seed is read-only
+
+The usability review of 19 Sep 2026 (`docs/UX-REVIEW-2026-09-19.pdf`) found the
+same thing on screen after screen: two views of one fact, disagreeing. Each fact
+below now has one reader, and a screen that reaches past it is the bug.
+
+| Fact | Read it through | Never |
+| --- | --- | --- |
+| Orders — to list, count or find one | `allOrders()`, `useOrders()`, `orderById()` in `src/state/orders.ts` | `ORDERS` or `board().run.orders` directly: the seed holds 8, the run 90, and the dashboard and assignment each counted a different set |
+| Stages waiting on a person | `openExceptions()` | `run.exc`, which a hand assignment never lowers |
+| An invoice's status | `invoicesNow()` / `statusOf()` in `src/lib/invoices.ts` | `INVOICES[].st`, a stored status that did not move when terms ran out |
+| A closed pay run | `runOf(mn).kept` in `src/state/payruns.ts` — the settings, roster and overtime it was approved with | today's `currentPayCfg()`, which rewrote a month already paid |
+| Who is on the roster | `currentStaff()` in `src/state/company.ts` | `STAFF`, which the staff form's edits never reach |
+| Who holds a capability | `can()` in `src/lib/permissions.ts`, over the company's roles | `ROLELIST`, which a role edited on screen never changes |
+| Who is free on a day | `availOn()` / `onLeaveOn()` in `src/lib/leave.ts` | `person.avail` alone, which ignores approved leave |
+
+**No screen writes into `src/data/`.** Anything a screen changes goes in a
+`createStore` store (`src/lib/store.ts`) with a `reset` added to
+`tests/setup.ts`. Three places still write into the seed and are the next to
+move: leave decisions (`LEAVE`, `src/screens/LeaveScreen.tsx`), rule toggles
+(`RULES`, `src/state/rules.tsx`) and the timeclock ledger
+(`src/state/timeclock.tsx`).
+
+**Rules are checked where the write happens**, not only in the control that
+should have prevented it (PRODUCT.md, principle 3): `wouldSelfReview()` in
+`src/lib/engine.ts` for QC pairing, `decidesOwn()` in `src/lib/permissions.ts`
+for any overtime, correction, swap or leave, and `finishStage()` for the rating
+required before an order is sent.
+
+**Pricing is behind `can('pricing')` on every money element**, and
+`npm run check:pricing` (`scripts/pricing.mjs`, run in CI's browser job) signs
+in as a lead and fails on any dollar figure on any route or tab. A new money
+element that forgets the check fails there.
+
+**Logic a test should reach goes in a `.ts` beside its screen**
+(`src/screens/**/*.ts`), which `vitest.config.ts` covers; a `.tsx` is not
+reachable by any test here. `src/screens/orders/fromMail.ts` and
+`src/screens/reports/money.ts` are the pattern.
+
+Three smaller rules hold across screens: every time on screen carries its zone
+(`TZ`), because for staff in India a bare time is a 9.5-hour misreading; a
+`Field` labels its control, so a new form needs no `aria-label`; and a money
+figure never breaks, so negatives use a true minus (`signed()` in
+`src/lib/format.ts`) and KPI figures scale rather than wrap.
 
 ## Comments
 

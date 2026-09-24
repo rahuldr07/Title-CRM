@@ -13,16 +13,21 @@ import { Turnaround } from './reports/Turnaround'
 import { ByStaff } from './reports/ByStaff'
 import { ByDepartment } from './reports/ByDepartment'
 import { Quality } from './reports/Quality'
+import { Money } from './reports/Money'
+import { useSession } from '@/state/session'
 import { useReportExporter } from '@/state/reportExport'
 
-const TABS = ['Received', 'Assigned', 'Turnaround', 'By staff', 'By department', 'Quality'] as const
+const TABS = ['Received', 'Assigned', 'Turnaround', 'By staff', 'By department', 'Quality', 'Money'] as const
 type Tab = (typeof TABS)[number]
 
 function Reports() {
   const { tab: tabParam, sw, dw, focus } = useSearch({ from: '/reports' })
   const isTab = (t?: string): t is Tab => !!t && (TABS as readonly string[]).includes(t)
 
-  const [tab, setTab] = useState<Tab>(isTab(tabParam) ? tabParam : 'Received')
+  /* Money is for whoever can see pricing; leads open Reports too. */
+  const { can } = useSession()
+  const tabs = TABS.filter((t) => t !== 'Money' || can('pricing'))
+  const [tab, setTab] = useState<Tab>(isTab(tabParam) && tabs.includes(tabParam) ? tabParam : 'Received')
   const [dept, setDept] = useState<string | undefined>(dw === 'all' ? undefined : dw)
   const [person, setPerson] = useState<string | undefined>(sw === 'all' ? undefined : sw)
   const { toast } = useUi()
@@ -86,7 +91,7 @@ function Reports() {
         }
       />
 
-      <Tabs tabs={[...TABS]} value={tab} onChange={pickTab} />
+      <Tabs tabs={tabs} value={tab} onChange={pickTab} />
 
       {tab === 'Received' ? <Received initialFocus={tabParam === 'Received' ? focus : undefined} /> : null}
       {tab === 'Assigned' ? <Assigned onOpenStaff={() => pickTab('By staff')} /> : null}
@@ -111,6 +116,8 @@ function Reports() {
           <Turnaround deliveries={history.data ?? []} />
         )
       ) : null}
+
+      {tab === 'Money' && can('pricing') ? <Money /> : null}
 
       {tab === 'Quality' ? (
         loading ? (

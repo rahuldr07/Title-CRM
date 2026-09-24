@@ -1,4 +1,8 @@
-import type { ReactNode } from 'react'
+import { Children, cloneElement, createContext, isValidElement, use, type ReactElement, type ReactNode } from 'react'
+
+/* The column heads, so a row can name each cell for the phone layout, where the
+   header row is hidden and a row reads as a card. */
+const Heads = createContext<string[]>([])
 
 export function FlexTable({
   cols,
@@ -22,7 +26,9 @@ export function FlexTable({
               <span key={h}>{h}</span>
             ))}
           </div>
-          <div className="tb">{children}</div>
+          <div className="tb">
+            <Heads value={head}>{children}</Heads>
+          </div>
         </div>
       </div>
     </div>
@@ -38,6 +44,12 @@ export function FlexRow({
   children: ReactNode
   onClick?: () => void
 }) {
+  const heads = use(Heads)
+  /* Conditional cells render as null and are dropped here, as they are from the
+     head, so the two stay aligned. */
+  const cells = Children.toArray(children).map((c, i) =>
+    isValidElement(c) && c.type === Cell ? cloneElement(c as ReactElement<CellProps>, { label: heads[i] }) : c,
+  )
   return (
     <div
       className="trow"
@@ -56,9 +68,18 @@ export function FlexRow({
           }
         : {})}
     >
-      {children}
+      {cells}
     </div>
   )
+}
+
+interface CellProps {
+  v?: ReactNode
+  s?: ReactNode
+  mono?: boolean
+  tone?: 'ok' | 'warn' | 'bad' | 'gr' | undefined
+  label?: string | undefined
+  children?: ReactNode
 }
 
 export function Cell({
@@ -66,16 +87,11 @@ export function Cell({
   s,
   mono,
   tone,
+  label,
   children,
-}: {
-  v?: ReactNode
-  s?: ReactNode
-  mono?: boolean
-  tone?: 'ok' | 'warn' | 'bad' | 'gr' | undefined
-  children?: ReactNode
-}) {
+}: CellProps) {
   return (
-    <div className="cell">
+    <div className="cell" data-label={label}>
       {children ?? (
         <>
           <div

@@ -12,6 +12,7 @@ import { now } from '@/lib/clock'
 import { fmtDate } from '@/lib/format'
 import { receivedCsv } from '@/lib/report-csv'
 import { useReportExport } from '@/state/reportExport'
+import { useSession } from '@/state/session'
 
 const val = (n: number) => (n ? <b className="mono">{n}</b> : <span className="gr">—</span>)
 
@@ -19,6 +20,9 @@ const FOCI = ['all', 'done', 'wip', 'clients']
 
 export function Received({ initialFocus }: { initialFocus?: string | undefined } = {}) {
   const navigate = useGo()
+  const { can } = useSession()
+  const pricing = can('pricing')
+  const clientCols = pricing ? '190px 120px 1fr 130px 140px' : '190px 120px 1fr 140px'
   const { run } = board()
   const [day, setDay] = useState(() => fmtDate(now()))
   const [focus, setFocus] = useState(initialFocus && FOCI.includes(initialFocus) ? initialFocus : 'all')
@@ -107,14 +111,14 @@ export function Received({ initialFocus }: { initialFocus?: string | undefined }
             {quiet.length
               ? `${quiet.length} on the books sent nothing.`
               : 'Every client on the books ordered.'}{' '}
-            Volume alone does not say who matters; the value column does.
+            {pricing ? 'Volume alone does not say who matters; the value column does.' : null}
           </FocusHead>
 
           <SectionHead>Who ordered</SectionHead>
           <FlexTable
-            cols="190px 120px 1fr 130px 140px"
-            min={760}
-            head={['Client', 'Orders', 'Share of intake', 'Value', 'Terms']}
+            cols={clientCols}
+            min={pricing ? 760 : 630}
+            head={['Client', 'Orders', 'Share of intake', ...(pricing ? ['Value'] : []), 'Terms']}
           >
             {clients.map((n) => {
               const mine = os.filter((o) => o.cl === n)
@@ -122,7 +126,7 @@ export function Received({ initialFocus }: { initialFocus?: string | undefined }
               const value = mine.reduce((a, o) => a + (PRODUCTS.find((p) => p.id === o.pr)?.fee ?? 0), 0)
               const pct = Math.round((mine.length / os.length) * 100)
               return (
-                <FlexRow cols="190px 120px 1fr 130px 140px" key={n}>
+                <FlexRow cols={clientCols} key={n}>
                   <Cell v={n} />
                   <Cell v={mine.length} mono />
                   <Cell>
@@ -131,7 +135,7 @@ export function Received({ initialFocus }: { initialFocus?: string | undefined }
                     </span>
                     <div className="s">{pct}%</div>
                   </Cell>
-                  <Cell v={money(value)} mono />
+                  {pricing ? <Cell v={money(value)} mono /> : null}
                   <Cell v={rec?.terms ?? '—'} tone="gr" />
                 </FlexRow>
               )

@@ -3,8 +3,12 @@ import { useGo } from '@/lib/nav'
 import { Btn, Card, Chip, Form, Label, PageHead } from '@/components/ui'
 import { RequireCap } from '@/components/RequireCap'
 import { useUi } from '@/state/ui'
-import { CLIENTS, COUNTIES, LINKTYPES, PRODUCTS } from '@/data/catalog'
-import { ORDERS } from '@/data/production'
+import { useSession } from '@/state/session'
+import { draftFromMail, type Draft } from './orders/fromMail'
+import { MAILBOX } from '@/data/intake'
+import { useSearch } from '@tanstack/react-router'
+import { CLIENTS, COUNTIES, LINKTYPES, PRODUCTS, US_STATES } from '@/data/catalog'
+import { addOrder, allOrders, nextOrderId } from '@/state/orders'
 import { ASSIGN_STAGES, STAGES, STATUS } from '@/data/org'
 import { board, previewAssign } from '@/lib/engine'
 import { LSTATE, findCounty } from '@/lib/derived'
@@ -18,22 +22,9 @@ const statusLabel = (k: string) => STATUS[k]?.[0] ?? k
 
 const NO_LINK: CountyLink = { u: '', s: 'none' }
 
-interface Draft {
-  addr: string
-  county: string
-  st: string
-  parcel: string
-  client: string
-  product: string
-  ref: string
-  eff: string
-  buyer: string
-  seller: string
-  instr: string
-  tier: string
-}
-
-const COUNTY_STATES = [...new Set(COUNTIES.map((c) => c.st))]
+/* Every state, not only those with counties on file: an order from a new state
+   (Kanawha, WV) could not be entered at all. */
+const STATES = Object.keys(US_STATES).sort()
 
 const blankDraft = (): Draft => ({
   addr: '',
@@ -61,7 +52,13 @@ function AsideLabel({ children }: { children: string }) {
 function NewOrder() {
   const navigate = useGo()
   const { toast } = useUi()
-  const [f, setF] = useState<Draft>(blankDraft)
+  const { can } = useSession()
+  const pricing = can('pricing')
+  const { mail } = useSearch({ from: '/orders/new' })
+  const [f, setF] = useState<Draft>(() => {
+    const read = mail ? MAILBOX().find((m) => m.x.some(([k, v]) => k === 'Order no' && v === mail)) : undefined
+    return { ...blankDraft(), ...(read ? draftFromMail(read) : {}) }
+  })
   const [err, setErr] = useState<string | null>(null)
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => {
@@ -77,7 +74,7 @@ function NewOrder() {
   const fee = Math.round((product.fee + tier.up) * 100) / 100
 
   const dupe = f.addr.trim()
-    ? ORDERS.find(
+    ? allOrders().find(
         (o) => o.cl === f.client && o.prop.toLowerCase().trim() === f.addr.toLowerCase().trim(),
       )
     : undefined
@@ -111,7 +108,7 @@ function NewOrder() {
       load[who] = (load[who] ?? 0) + 1
     })
 
-    const id = `41934${String(10 + ORDERS.length).padStart(2, '0')}-1`
+    const id = nextOrderId()
     const order: Order = {
       id,
       cl: f.client,
@@ -132,7 +129,7 @@ function NewOrder() {
       parcel: f.parcel,
       eff: f.eff,
     }
-    ORDERS.unshift(order)
+    addOrder(order)
     toast(`${id} taken — due ${fmtDT(due.at)} ${TZ}`)
     navigate({ to: '/orders/$orderId', params: { orderId: id } })
   }
@@ -215,7 +212,7 @@ function NewOrder() {
                   value={f.st}
                   onChange={(e) => set('st', e.target.value)}
                 >
-                  {COUNTY_STATES.map((s) => (
+                  {STATES.map((s) => (
                     <option key={s} value={s}>
                       {s}
                     </option>
@@ -299,7 +296,7 @@ function NewOrder() {
                       onClick={() => set('tier', x.id)}
                     >
                       {x.n}
-                      {x.up ? ` +$${x.up}` : ''}
+                      {pricing && x.up ? ` +${money(x.up)}` : ''}
                     </button>
                   ))}
                 </div>
@@ -479,21 +476,25 @@ function NewOrder() {
               </p>
             )}
 
-            <AsideLabel>Price</AsideLabel>
-            <dl className="kv" style={{ fontSize: 'var(--t-small)' }}>
-              <dt>{product.id}</dt>
-              <dd className="mono">{money(product.fee)}</dd>
-              {tier.up ? (
-                <>
-                  <dt>{tier.n}</dt>
-                  <dd className="mono">+{money(tier.up)}</dd>
-                </>
-              ) : null}
-              <dt style={{ fontWeight: 600 }}>Total</dt>
-              <dd className="mono" style={{ fontWeight: 600 }}>
-                {money(fee)}
-              </dd>
-            </dl>
+            {pricing ? (
+              <>
+                <AsideLabel>Price</AsideLabel>
+                <dl className="kv" style={{ fontSize: 'var(--t-small)' }}>
+                  <dt>{product.id}</dt>
+                  <dd className="mono">{money(product.fee)}</dd>
+                  {tier.up ? (
+                    <>
+                      <dt>{tier.n}</dt>
+                      <dd className="mono">+{money(tier.up)}</dd>
+                    </>
+                  ) : null}
+                  <dt style={{ fontWeight: 600 }}>Total</dt>
+                  <dd className="mono" style={{ fontWeight: 600 }}>
+                    {money(fee)}
+                  </dd>
+                </dl>
+              </>
+            ) : null}
 
             <Btn style={{ width: '100%', marginTop: 18 }} onClick={create}>
               Create order

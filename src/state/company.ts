@@ -212,8 +212,11 @@ export function setPause(stage: string, on: boolean): void {
 }
 
 export const useStaff = (): Person[] => useStoreSlice(store, (c) => c.staff)
+export const currentStaff = (): Person[] => store.get().staff
 export const useClients = (): Client[] => useStoreSlice(store, (c) => c.clients)
+export const currentClients = (): Client[] => store.get().clients
 export const useRoles = (): Role[] => useStoreSlice(store, (c) => c.roles)
+export const currentRoles = (): Role[] => store.get().roles
 export const usePerms = (): Perm[] => useStoreSlice(store, (c) => c.perms)
 
 const nextId = (prefix: string, taken: string[]) => {

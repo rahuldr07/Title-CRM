@@ -105,12 +105,18 @@ export function Sidebar({ current }: { current: string }) {
             {g.t.map(([label, route, glyph]) => {
               const badge = badgeFor(route)
               return (
-                <button
+                <a
                   key={route}
-                  type="button"
+                  href={`/${route}`}
                   className={route === current ? 'on' : ''}
                   aria-current={route === current ? 'page' : undefined}
-                  onClick={() => go(route)}
+                  onClick={(e) => {
+                    /* A plain click stays in the app; a modified or middle click is the
+                       browser's, which is how an item opens in a new tab. */
+                    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+                    e.preventDefault()
+                    go(route)
+                  }}
                 >
                   <i>{glyph}</i>
                   {label}
@@ -119,7 +125,7 @@ export function Sidebar({ current }: { current: string }) {
                       {badge.n}
                     </span>
                   ) : null}
-                </button>
+                </a>
               )
             })}
           </div>

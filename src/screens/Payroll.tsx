@@ -1,4 +1,4 @@
-import { useReducer, useState } from 'react'
+import { useState } from 'react'
 import { useGo } from '@/lib/nav'
 import {
   Assumption,
@@ -18,9 +18,10 @@ import {
 import { RequireCap } from '@/components/RequireCap'
 import { useSession } from '@/state/session'
 import { useUi } from '@/state/ui'
-import { PAYCFG, PAYMONTHS, PAYRUNS, RUNSTATE, RUNSTEPS } from '@/data/hrms'
-import { STAFF } from '@/data/people'
+import { PAYCFG, PAYMONTHS, RUNSTATE, RUNSTEPS } from '@/data/hrms'
 import {
+  companyCost,
+  deductionParts,
   inr,
   nextRunAction,
   paidStaff,
@@ -30,32 +31,38 @@ import {
   type PayTotals,
 } from '@/lib/payroll'
 import { fmtDate, initials } from '@/lib/format'
-import { now } from '@/lib/clock'
 import { csvName, downloadCSV, type CsvRow } from '@/lib/csv'
 import { registerRows } from '@/lib/payroll-csv'
+import { bankProblem } from '@/lib/forms'
 import { recoverForRun } from '@/state/loans'
+import { setRunState, useRuns } from '@/state/payruns'
+import { useStaff } from '@/state/company'
 import type { Person, RunState } from '@/data/types'
 
 type Tab = 'The run' | 'Register' | 'Cost and statutory' | 'Leavers'
 
-const REGISTER_COLS = '180px 100px 90px 120px 100px 90px 90px 110px 120px'
+/* Loans and reimbursements have columns so a row reads across to its net pay. */
+const REGISTER_COLS = '180px 100px 70px 120px 100px 90px 90px 110px 100px 100px 120px'
 
 function Payroll() {
   const navigate = useGo()
   const { me } = useSession()
   const { toast, openModal, closeModal } = useUi()
 
-  const [, changed] = useReducer((n: number) => n + 1, 0)
+  const runs = useRuns()
+  const staff = useStaff()
   const [month, setMonth] = useState(PAYMONTHS[PAYMONTHS.length - 1])
   const [tab, setTab] = useState<Tab>('The run')
 
-  const run = PAYRUNS[month]
+  const run = runs[month]
   const totals = payTotals(month)
 
-  const noCtc = STAFF.filter((x) => x.active !== false && !x.ctc)
-  const noBank = paidStaff().filter((x) => !x.bank || !x.bank.acct)
-  const noDoj = paidStaff().filter((x) => !x.doj)
-  const leavers = paidStaff().filter((p) => p.leaving)
+  const onPayroll = paidStaff(month)
+  const noCtc = (run.kept?.staff ?? staff).filter((x) => x.active !== false && !x.ctc)
+  /* A bad or placeholder account bounces, so it counts the same as none on file. */
+  const noBank = onPayroll.filter((x) => bankProblem(x.bank) !== null)
+  const noDoj = onPayroll.filter((x) => !x.doj)
+  const leavers = onPayroll.filter((p) => p.leaving)
 
   const checks = noCtc.length + noBank.length + noDoj.length + totals.lop.length
   const blockers = noCtc.length + noBank.length
@@ -71,7 +78,7 @@ function Payroll() {
 
   const sub =
     tab === 'The run'
-      ? `${month} · ${RUNSTATE[run.state][0]} · ${paidStaff().length} people on the payroll`
+      ? `${month} · ${RUNSTATE[run.state][0]} · ${onPayroll.length} people on the payroll`
       : tab === 'Register'
         ? `${month} · every figure built from CTC and this month's attendance`
         : tab === 'Cost and statutory'
@@ -84,10 +91,8 @@ function Payroll() {
     navigate({ to: '/payslips/$personId', params: { personId: id }, search: { m: month } })
 
   const setState = (to: RunState) => {
-    run.state = to
-    if (to === 'paid') run.published = true
+    setRunState(month, to, me.n)
     closeModal()
-    changed()
     toast(`${month} — ${RUNSTATE[to][0]}`)
   }
 
@@ -135,8 +140,6 @@ function Payroll() {
           expected={me.n}
           totals={totals}
           onApprove={() => {
-            run.by = me.n
-            run.at = fmtDate(now())
             recoverForRun(
               month,
               totals.list.map((x) => x.p.id),
@@ -185,17 +188,18 @@ function Payroll() {
 
   const exportRegister = () => exportCsv('payroll-register', registerRows(totals.list), 'people')
 
-  const exportBankFile = () =>
-    exportCsv(
-      'bank-file',
-      [
-        ['Beneficiary', 'Account', 'IFSC', 'Amount', 'Narration'],
-        ...totals.list
-          .filter((x) => x.p.bank?.acct)
-          .map((x) => [x.p.bank.name, x.p.bank.acct, x.p.bank.ifsc, x.net, `Salary ${month}`]),
-      ],
-      'credits',
+  const exportBankFile = () => {
+    const payable = totals.list.filter((x) => bankProblem(x.p.bank) === null)
+    const out = downloadCSV(csvName(`bank-file-${month.replace(' ', '-')}`), [
+      ['Beneficiary', 'Account', 'IFSC', 'Amount', 'Narration'],
+      ...payable.map((x) => [x.p.bank.name, x.p.bank.acct, x.p.bank.ifsc.toUpperCase(), x.net, `Salary ${month}`]),
+    ])
+    const left = totals.list.length - payable.length
+    toast(
+      `${out.name} — ${payable.length} credit${payable.length === 1 ? '' : 's'}` +
+        (left ? `; ${left} left out for bank details that would bounce` : ''),
     )
+  }
 
   const STATUTORY: [label: string, name: string, header: string[], row: (x: PayTotals['list'][0]) => (string | number)[]][] =
     [
@@ -249,7 +253,7 @@ function Payroll() {
 
       <div className="fbar" role="group" aria-label="Payroll month">
         {PAYMONTHS.map((m) => {
-          const r = PAYRUNS[m]
+          const r = runs[m]
           return (
             <button
               key={m}
@@ -353,7 +357,9 @@ function Payroll() {
             <Kpi
               title="Deductions"
               value={<span className="warn">{inr(totals.ded)}</span>}
-              detail={`PF ${inr(totals.pf)} · PT ${inr(totals.pt)} · TDS ${inr(totals.tds)}`}
+              detail={deductionParts(totals)
+                .map(([k, v]) => `${k} ${inr(v)}`)
+                .join(' · ')}
               onClick={() => setTab('Cost and statutory')}
             />
             <Kpi
@@ -373,8 +379,8 @@ function Payroll() {
                     <Check
                       key={`bank-${p.id}`}
                       bad
-                      title={`${p.n} has no bank account on record`}
-                      detail="Their payslip is produced and their money has nowhere to go. They are left out of the bank file rather than paid to a made-up account."
+                      title={`${p.n} — ${bankProblem(p.bank)?.toLowerCase() ?? 'bank details'}`}
+                      detail="Their payslip is produced but a salary sent to this account would bounce. They are left out of the bank file until it is fixed."
                       action="Add account"
                       onAction={() => openPerson(p.id)}
                     />
@@ -426,7 +432,7 @@ function Payroll() {
           <SectionHead>The register — {totals.list.length} people</SectionHead>
           <Card>
             <div className="tsc">
-              <div style={{ minWidth: 1060 }}>
+              <div style={{ minWidth: 1260 }}>
                 <div className="trow h" style={{ gridTemplateColumns: REGISTER_COLS }}>
                   <span>Name</span>
                   <span>Department</span>
@@ -436,6 +442,8 @@ function Payroll() {
                   <span>PT</span>
                   <span>ESI</span>
                   <span>TDS</span>
+                  <span>Loans</span>
+                  <span>Reimb.</span>
                   <span>Net pay</span>
                 </div>
                 <div className="tb">
@@ -482,6 +490,16 @@ function Payroll() {
                         <div className={`v mono ${x.tds ? '' : 'gr'}`}>{x.tds ? inr(x.tds) : '—'}</div>
                       </div>
                       <div className="cell">
+                        {x.loanDeds.length ? (
+                          <div className="v mono">{inr(x.loanDeds.reduce((a, d) => a + d.amount, 0))}</div>
+                        ) : (
+                          <div className="v mono gr">—</div>
+                        )}
+                      </div>
+                      <div className="cell">
+                        <div className={`v mono ${x.claims ? '' : 'gr'}`}>{x.claims ? `+${inr(x.claims)}` : '—'}</div>
+                      </div>
+                      <div className="cell">
                         <div className="v mono ok" style={{ fontWeight: 650 }}>
                           {inr(x.net)}
                         </div>
@@ -519,6 +537,12 @@ function Payroll() {
                       <div className="v mono">{inr(totals.tds)}</div>
                     </div>
                     <div className="cell">
+                      <div className="v mono">{inr(totals.loans)}</div>
+                    </div>
+                    <div className="cell">
+                      <div className="v mono">+{inr(totals.claims)}</div>
+                    </div>
+                    <div className="cell">
                       <div className="v mono ok" style={{ fontWeight: 700 }}>
                         {inr(totals.net)}
                       </div>
@@ -543,6 +567,7 @@ function Payroll() {
               [
                 ['Gross earnings', totals.gross],
                 ['Provident fund — employer', totals.erpf],
+                ['ESI — employer', totals.esiEr],
                 ['Gratuity provisioned', totals.grat],
               ] as [string, number][]
             ).map(([label, v]) => (
@@ -552,7 +577,7 @@ function Payroll() {
               style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 0 0', fontSize: 'var(--t-lead)' }}
             >
               <b>Total cost</b>
-              <b className="mono">{inr(totals.gross + totals.erpf + totals.grat)}</b>
+              <b className="mono">{inr(companyCost(totals))}</b>
             </div>
             <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 12 }}>
               Net pay is what lands in accounts; this is what the month actually costs. The difference is
@@ -565,7 +590,7 @@ function Payroll() {
             {(
               [
                 ['Provident fund — employee + employer', totals.pf + totals.erpf, 'EPFO, by the 15th'],
-                ['ESI — employee share', totals.esi, 'ESIC, by the 15th'],
+                ['ESI — employee + employer', totals.esi + totals.esiEr, 'ESIC, by the 15th'],
                 ['Professional tax', totals.pt, `${PAYCFG.ptState}, monthly`],
                 ['TDS on salary', totals.tds, 'by the 7th of next month'],
               ] as [string, number, string][]

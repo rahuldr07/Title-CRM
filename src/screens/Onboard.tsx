@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useGo } from '@/lib/nav'
-import { Btn, Card, CardHead, Field, Form, PageHead, Rows } from '@/components/ui'
+import { Banner, Btn, Card, CardHead, Field, Form, PageHead, Rows } from '@/components/ui'
 import { RequireCap } from '@/components/RequireCap'
-import { useUi } from '@/state/ui'
 import { US_STATES } from '@/data/catalog'
 
 const STEPS: [string, string][] = [
@@ -13,7 +12,6 @@ const STEPS: [string, string][] = [
 ]
 
 function Onboard() {
-  const { toast } = useUi()
   const navigate = useGo()
   const [name, setName] = useState('')
   const [state, setState] = useState('PA')
@@ -58,19 +56,15 @@ function Onboard() {
             </select>
           </Field>
         </Form>
+        {/* It said "created" and created nothing. A workspace is a tenant on the
+            server — a new one here would still show this company's data — so
+            the form says what it cannot do rather than pretending to. */}
+        <Banner kind="b" icon="ⓘ" style={{ margin: '16px 0 0' }}>
+          A workspace is created on the server, which is not connected yet. Nothing typed here is
+          saved and no company is added.
+        </Banner>
         <div style={{ marginTop: 16 }}>
-          <Btn
-            onClick={() => {
-              if (!name.trim()) {
-                toast('The company needs a name')
-                return
-              }
-              toast(`${name.trim()} created — ${plan}`)
-              navigate({ to: '/dash' })
-            }}
-          >
-            Create the workspace
-          </Btn>
+          <Btn disabled>Create the workspace</Btn>
         </div>
       </Card>
 

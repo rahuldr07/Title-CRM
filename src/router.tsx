@@ -56,7 +56,14 @@ const routeTree = rootRoute.addChildren([
     component: lazyRouteComponent(() => import('./screens/Orders')),
   }),
   /* Static before dynamic, so "new" is the form and not an order id. */
-  screen('/orders/new', () => import('./screens/NewOrder')),
+  /* Intake's "Review & create order" names the email, so the form opens on it. */
+  createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/orders/new',
+    validateSearch: (s: Record<string, unknown>): { mail?: string } =>
+      typeof s.mail === 'string' ? { mail: s.mail } : {},
+    component: lazyRouteComponent(() => import('./screens/NewOrder')),
+  }),
   screen('/orders/$orderId', () => import('./screens/OrderDetail')),
   screen('/mywork', () => import('./screens/MyWork')),
   screen('/mypay', () => import('./screens/MyPayslips')),
@@ -71,7 +78,15 @@ const routeTree = rootRoute.addChildren([
     component: lazyRouteComponent(() => import('./screens/Assignment')),
   }),
   screen('/intake', () => import('./screens/Intake')),
-  screen('/commitment', () => import('./screens/CommitmentReport')),
+  /* "Open report" on an order carries the order, so the report opens on it
+     rather than on whichever order the report defaults to. */
+  createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/commitment',
+    validateSearch: (s: Record<string, unknown>): { order?: string } =>
+      typeof s.order === 'string' ? { order: s.order } : {},
+    component: lazyRouteComponent(() => import('./screens/CommitmentReport')),
+  }),
 
   /* Business */
   screen('/leads', () => import('./screens/Leads')),

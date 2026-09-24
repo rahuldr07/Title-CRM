@@ -7,7 +7,7 @@ import { fmtDate } from '@/lib/format'
 import { now } from '@/lib/clock'
 import { removeStaff, saveStaff, useCompany, useRoles, useStaff } from '@/state/company'
 import { newPerson, type Person } from '@/data/types'
-import { EMAIL_ERROR, isDuplicateName, isEmail } from '@/lib/forms'
+import { EMAIL_ERROR, bankProblem, idProblem, isDuplicateName, isEmail } from '@/lib/forms'
 
 export function StaffForm({
   id,
@@ -72,6 +72,23 @@ export function StaffForm({
     if (!isEmail(mail)) return setError(EMAIL_ERROR)
     if (isDuplicateName(staff, mail, (x) => x.e ?? '', (x) => x.id === id))
       return setError(`${mail} already belongs to someone here.`)
+
+    /* Only what was changed here is checked, so editing someone's salary is not
+       held up by details already on file; payroll flags those on its own. */
+    const changed = (now: string, was: string | undefined) => now.trim() !== (was ?? '').trim()
+    if ((changed(acct, rec?.bank?.acct) || changed(ifsc, rec?.bank?.ifsc)) && (acct.trim() || ifsc.trim())) {
+      const bad = bankProblem({ acct, ifsc })
+      if (bad) return setError(`${bad}. A salary sent to it would bounce.`)
+    }
+    const ids = [
+      ['pan', pan, rec?.pan],
+      ['uan', uan, rec?.uan],
+      ['aadhaar', aadhaar, rec?.aadhaar],
+    ] as const
+    for (const [kind, now, was] of ids) {
+      const bad = changed(now, was) ? idProblem(kind, now) : null
+      if (bad) return setError(`${bad}.`)
+    }
 
     saveStaff(
       {

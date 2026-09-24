@@ -3,7 +3,7 @@ import { Banner, Btn, Card, CardHead, Label, Rows, SecHead, Tabs } from '@/compo
 import { useUi } from '@/state/ui'
 import { useGo } from '@/lib/nav'
 import { StatusForm, StatusDelete } from './forms/StatusForm'
-import { ORDERS } from '@/data/production'
+import { useOrders } from '@/state/orders'
 import { csvName, downloadCSV } from '@/lib/csv'
 import { moveStatus, setNaming, useNaming, useStatuses } from '@/state/company'
 
@@ -16,6 +16,7 @@ export function WorkflowTab() {
   const { openModal, closeModal, toast } = useUi()
   const navigate = useGo()
   const statuses = useStatuses()
+  const orders = useOrders()
   const naming = useNaming()
   const [tab, setTab] = useState<WTab>('Stages')
 
@@ -53,7 +54,7 @@ export function WorkflowTab() {
         v[0],
         k,
         i < MAIN_LINE ? `Main line · position ${i + 1}` : 'Exception branch',
-        ORDERS.filter((o) => o.stt === k).length,
+        orders.filter((o) => o.stt === k).length,
       ]),
     ])
 
@@ -88,7 +89,7 @@ export function WorkflowTab() {
             />
             <Rows bare>
               {statuses.map(([k, v], i) => {
-                const used = ORDERS.filter((o) => o.stt === k).length
+                const used = orders.filter((o) => o.stt === k).length
                 return (
                   <div className="rw" key={k}>
                     <span

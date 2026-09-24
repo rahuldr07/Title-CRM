@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { budgetOK, checkpoints, orderPlan, shareTotal, sharesFor, slaHours, hh } from '@/lib/sla'
+import { budgetOK, checkpoints, curStageOf, orderPlan, shareTotal, sharesFor, slaHours, hh, stageWindows } from '@/lib/sla'
 import { BUDGET } from '@/data/budget'
 import { ASSIGN_STAGES } from '@/data/org'
 import { PRODUCTS } from '@/data/catalog'
 import { ORDERS } from '@/data/production'
+import { SEED_NOW } from '@/lib/clock'
+import type { OrderStatus } from '@/data/types'
 
 /**
  * The promise to the client, and the internal checkpoints that keep an order on
@@ -105,5 +107,60 @@ describe('hour formatting', () => {
     expect(hh(2.5)).toBe('2.5h')
     expect(hh(1)).toBe('1h')
     expect(hh(0.6667)).toBe('40m')
+  })
+})
+
+/*
+ * An order's place in the pipeline is its status.
+ *
+ * The checkpoints worked out the current stage from the last stage that had a
+ * person on it, and seed orders are staffed ahead — so an order whose status
+ * said Search showed Search to Typing QC as done. The status decides; the
+ * assignments decide only for a record that carries no status.
+ */
+describe('where an order is', () => {
+  const staffed = { Search: 'us', 'Search QC': 'ln', Typing: 'pd', 'Typing QC': 'sk', RTS: 'hw' }
+  const order = (stt?: OrderStatus) => ({ cl: 'MGR', pr: 'LIEN', recv: SEED_NOW, a: staffed, ...(stt ? { stt } : {}) })
+  const doneRows = (stt?: OrderStatus) => orderPlan(order(stt)).rows.filter((r) => r.done).map((r) => r.stage)
+  const currentRow = (stt?: OrderStatus) => orderPlan(order(stt)).rows.find((r) => r.current)?.stage
+
+  it('is at Search while its status is Search, however far it is staffed', () => {
+    expect(doneRows('search')).toEqual([])
+    expect(currentRow('search')).toBe('Search')
+  })
+
+  it('has the stages before its status done', () => {
+    expect(doneRows('tqc')).toEqual(['Search', 'Search QC', 'Typing'])
+    expect(currentRow('tqc')).toBe('Typing QC')
+  })
+
+  it('is past every stage once sent', () => {
+    expect(doneRows('sent')).toEqual(['Search', 'Search QC', 'Typing', 'Typing QC', 'RTS'])
+    expect(currentRow('sent')).toBeUndefined()
+  })
+
+  it('falls back to its assignments when it carries no status', () => {
+    expect(currentRow()).toBe('RTS')
+  })
+
+  it('names the same stage the header does', () => {
+    expect(curStageOf(order('typing'))).toBe('Typing')
+  })
+})
+
+/*
+ * One formula for a stage's share of the clock. The budget screen wrote it out
+ * four more times beside `checkpoints`, so the screen and the test could each
+ * be right about a different formula.
+ */
+describe('stage windows', () => {
+  it('are what checkpoints gives for a product', () => {
+    const pr = PRODUCTS[0].id
+    expect(stageWindows(24, BUDGET.buffer, sharesFor(pr))).toEqual(checkpoints(24, pr))
+  })
+
+  it('fill the promise less the buffer', () => {
+    const w = stageWindows(48, 10, BUDGET.base)
+    expect(w.at(-1)!.by).toBeCloseTo(48 * 0.9 * (shareTotal(BUDGET.base) / 100), 6)
   })
 })

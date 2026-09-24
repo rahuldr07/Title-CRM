@@ -4,16 +4,23 @@ import {
   INVOICE_MONTHS,
   balance,
   inRange,
+  invoicesNow,
   monthBounds,
   monthInRange,
   normalise,
   outstandingOf,
   rangeForMonth,
   rangeMonth,
+  statusOf,
+  unbilledOrders,
   sumBy,
 } from '@/lib/invoices'
 import { parseIso } from '@/lib/format'
 import { INVOICES } from '@/data/business'
+import { CLIENTS } from '@/data/catalog'
+import { saveClient } from '@/state/company'
+import { recordPayment } from '@/state/invoices'
+import type { Invoice } from '@/data/types'
 
 /**
  * Scoping the invoice register, and the money it adds up.
@@ -116,5 +123,141 @@ describe('the money', () => {
 
   it('never reports an invoice as paid beyond its own amount', () => {
     for (const i of INVOICES) expect(i.paid).toBeLessThanOrEqual(i.amt)
+  })
+})
+
+/*
+ * An invoice's status is worked out, never stored.
+ *
+ * The seed carried a status per invoice, and nothing moved it when the clock
+ * passed the client's terms, so on 3 Aug an invoice a month past Net 30 still
+ * read "Part paid" and the Overdue tile showed $23 against more than $20k past
+ * terms. Status follows from three facts: the balance, the issue date, and the
+ * client's terms.
+ */
+describe('an invoice’s status', () => {
+  const inv = (over: Partial<Invoice> = {}): Invoice => ({
+    id: 'INV-T',
+    cl: 'T',
+    code: 'T',
+    m: 'Jul 2026',
+    mi: 0,
+    amt: 1000,
+    paid: 0,
+    orders: 10,
+    issued: new Date(2026, 6, 1),
+    st: 'open',
+    ...over,
+  })
+  const at = (d: number, m = 7) => new Date(2026, m, d, 12)
+
+  it('is paid once nothing is owed, however late it was', () => {
+    expect(statusOf(inv({ paid: 1000 }), 'Net 30', at(3))).toBe('paid')
+  })
+
+  it('is overdue after the terms run out, even when part paid', () => {
+    expect(statusOf(inv({ paid: 400 }), 'Net 30', at(3))).toBe('overdue')
+  })
+
+  it('is part paid while still inside its terms', () => {
+    expect(statusOf(inv({ paid: 400 }), 'Net 30', at(20, 6))).toBe('part')
+  })
+
+  it('is open while unpaid and inside its terms', () => {
+    expect(statusOf(inv(), 'Net 30', at(20, 6))).toBe('open')
+  })
+
+  it('is not overdue on its last day of terms', () => {
+    /* Issued 1 Jul on Net 30: due 31 Jul, so paying on the 31st is on time. */
+    expect(statusOf(inv(), 'Net 30', new Date(2026, 6, 31, 23, 59))).toBe('open')
+    expect(statusOf(inv(), 'Net 30', new Date(2026, 7, 1, 0, 1))).toBe('overdue')
+  })
+
+  it('reads the number of days from the terms', () => {
+    expect(statusOf(inv(), 'Net 15', at(17, 6))).toBe('overdue')
+    expect(statusOf(inv(), 'Net 30', at(17, 6))).toBe('open')
+  })
+
+  it('treats terms with no days as due on the day it was issued', () => {
+    expect(statusOf(inv(), 'Per order', new Date(2026, 6, 1, 18))).toBe('open')
+    expect(statusOf(inv(), 'Per order', at(2, 6))).toBe('overdue')
+  })
+})
+
+describe('the register on the pinned day', () => {
+  const owed = (st: string) =>
+    invoicesNow()
+      .filter((i) => i.st === st)
+      .reduce((a, i) => a + balance(i), 0)
+
+  it('shows MGR’s July invoice as overdue, not part paid', () => {
+    expect(invoicesNow().find((i) => i.id === 'INV-2026-0405')?.st).toBe('overdue')
+  })
+
+  it('counts more than $20k as overdue', () => {
+    expect(owed('overdue')).toBeGreaterThan(20_000)
+  })
+
+  it('follows a change to the client’s terms', () => {
+    const mgr = CLIENTS.find((c) => c.n === 'MGR')!
+    saveClient({ ...mgr, terms: 'Net 60' }, 'MGR')
+    expect(invoicesNow().find((i) => i.id === 'INV-2026-0405')?.st).toBe('part')
+  })
+
+  it('leaves the seed register untouched', () => {
+    const before = INVOICES.map((i) => i.st)
+    invoicesNow()
+    expect(INVOICES.map((i) => i.st)).toEqual(before)
+  })
+})
+
+/*
+ * Orders with no invoice are counted against the invoices, not against the
+ * client record's own figure — which is a different count, and put 323 of MGR's
+ * orders "with no invoice" when its invoices bill all 1,436.
+ */
+describe('orders with no invoice', () => {
+  it('is none when the invoices bill every order', () => {
+    const mgr = CLIENTS.find((c) => c.n === 'MGR')!
+    expect(unbilledOrders(mgr, invoicesNow())).toBe(0)
+  })
+
+  it('counts what the invoices leave out', () => {
+    const mgr = CLIENTS.find((c) => c.n === 'MGR')!
+    expect(unbilledOrders({ ...mgr, orders: mgr.orders + 7 }, invoicesNow())).toBe(7)
+  })
+})
+
+/*
+ * Recording a payment. Month-end could not be closed from the register: there
+ * was no way to take money against an invoice, so nothing on it could ever
+ * move from owed to paid.
+ */
+describe('recording a payment', () => {
+  const july = () => invoicesNow().find((i) => i.id === 'INV-2026-0405')!
+
+  it('takes it off what is owed', () => {
+    const before = balance(july())
+    expect(recordPayment('INV-2026-0405', 5000)).toBeNull()
+    expect(balance(july())).toBeCloseTo(before - 5000, 2)
+  })
+
+  it('settles the invoice when it covers the balance', () => {
+    recordPayment('INV-2026-0405', balance(july()))
+    expect(july().st).toBe('paid')
+  })
+
+  it('refuses more than is owed', () => {
+    expect(recordPayment('INV-2026-0405', balance(july()) + 1)).toMatch(/more than/i)
+    expect(july().st).toBe('overdue')
+  })
+
+  it('refuses nothing, or less than nothing', () => {
+    expect(recordPayment('INV-2026-0405', 0)).toMatch(/above zero/i)
+  })
+
+  it('leaves the bundled register alone', () => {
+    recordPayment('INV-2026-0405', 100)
+    expect(INVOICES.find((i) => i.id === 'INV-2026-0405')!.paid).toBe(9629.9)
   })
 })

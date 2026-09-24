@@ -159,7 +159,8 @@ body.dark {
  * here at the same selector and specificity so the later rule wins.
  */
 .navlbl,
-.side nav button:hover {
+.side nav button:hover,
+.side nav a:hover {
   color: var(--navon);
 }
 
@@ -185,6 +186,7 @@ body {
 .tenant .nm span,
 .tenant .cx,
 .side nav button .bdg,
+.side nav a .bdg,
 .me .av,
 .me span,
 h2.sec,
@@ -241,6 +243,8 @@ h2.sec,
 body,
 .side nav button,
 .side nav button i,
+.side nav a,
+.side nav a i,
 .me .lo,
 p.sub,
 .btn,
@@ -886,9 +890,16 @@ body.modalopen {
  */
 .kpi {
   min-width: 0;
+  container-type: inline-size;
 }
+/* Letting the figure wrap "anywhere" kept the row inside the phone but broke
+ * numbers in half — "$126,194 / .60", "₹8,76,00 / 6". A figure stays on one line
+ * and scales with its tile instead: 13cqi of the tile's width, capped at the type
+ * step, which leaves every desktop tile at its full size. `Kpi` applies the same
+ * cap to a `valueSize` given inline. */
 .kpi .v {
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  font-size: min(var(--t-display), 13cqi);
 }
 
 /*
@@ -1033,14 +1044,14 @@ body *::-webkit-scrollbar-thumb:hover {
   border-radius: 99px;
   background: var(--card);
   box-shadow: var(--sh1);
-  font-size: 13.5px;
+  font-size: var(--t-small);
   font-weight: 600;
   color: var(--ink);
 }
 .needsYou .bdg {
   background: var(--bad);
   color: #fff;
-  font-size: 11px;
+  font-size: var(--t-mini);
   font-weight: 700;
   min-width: 20px;
   height: 20px;
@@ -1184,6 +1195,222 @@ html {
     width: calc(100vw - 232px - 26px);
     max-width: none;
   }
+}
+
+/*
+ * Working tables on a phone.
+ *
+ * Every table sets a minimum width (700 to 980px) and scrolls sideways inside
+ * its card, so at 390px My work's queue showed #, Order and Client and hid
+ * Stage, Due and Open; the past-due list lost Stage and Due; the exceptions
+ * assign control sat off-screen. Below 560px a row becomes a card: the header
+ * row goes, the cells flow two to a line, and each cell carries its column's
+ * name (`data-label`, set by DataTable and FlexTable) above its value. The
+ * `!important`s beat the inline grid templates and minimum widths each table
+ * sets on its rows.
+ */
+@media (max-width: 560px) {
+  .tsc > div {
+    min-width: 0 !important;
+  }
+  .tsc .trow.h {
+    display: none;
+  }
+  .tsc .trow {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px 14px;
+    padding: 12px 14px;
+  }
+  .tsc .cell[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    font-size: var(--t-micro);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .tsc .cell select,
+  .tsc .cell .inp {
+    width: 100%;
+  }
+}
+
+/*
+ * My work on a phone: the queue first. It is the thing a production seat opens
+ * the screen for, and stacked in desktop order it sat two-thirds of the way down,
+ * below birthdays and leave. Desktop keeps the design's order.
+ */
+@media (max-width: 560px) {
+  .mw {
+    display: flex;
+    flex-direction: column;
+  }
+  .mw-queue {
+    order: -1;
+    margin-bottom: 16px;
+  }
+}
+
+/*
+ * A banner with an action, on a phone. `.bnr` is a flex row with the action
+ * pinned right (`.ba`, flex: none), so at 390px the action kept its width and
+ * the message was squeezed into a strip a word or two wide — "17 stages could
+ * not be placed" ran to twenty lines. The action drops below the message.
+ */
+@media (max-width: 560px) {
+  .bnr {
+    flex-wrap: wrap;
+  }
+  .bnr > div:not(.ba) {
+    flex: 1 1 calc(100% - 40px);
+    min-width: 0;
+  }
+  .bnr .ba {
+    margin-left: 30px;
+    flex-wrap: wrap;
+  }
+}
+
+/*
+ * Sidebar items are links, so one can be opened in a new tab or its address
+ * copied; as buttons, nothing could. design.css styles them as
+ * `.side nav button`, which the port keeps, so the same rules are restated for
+ * `a` here. Type sizes and the hover colour are restated above, beside the
+ * button's own.
+ */
+.side nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 18px;
+  color: var(--navtx);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: color 0.15s, background 0.15s;
+}
+.side nav a:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.side nav a.on {
+  color: var(--navon);
+  background: rgba(99, 102, 241, 0.16);
+  border-left-color: var(--brand2);
+  font-weight: 600;
+}
+.side nav a i {
+  font-style: normal;
+  width: 17px;
+  text-align: center;
+  flex: none;
+  opacity: 0.9;
+}
+.side nav a .bdg {
+  margin-left: auto;
+  font-family: var(--mono);
+  background: var(--bad);
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 99px;
+  font-weight: 700;
+}
+
+/*
+ * A table row that does nothing does not look as if it does. design.css gives
+ * every `.tb .trow` a pointer and a hover bar, so the invoice register's rows
+ * invited a click they had no answer to. A row that acts sets role="button"
+ * (DataTable, FlexRow and every hand-built clickable row do), so it alone keeps
+ * the pointer and the bar.
+ */
+.tb .trow:not([role='button']) {
+  cursor: default;
+}
+.tb .trow:not([role='button']):hover {
+  background: none;
+  box-shadow: none;
+}
+
+/*
+ * Printing, which is how a payslip becomes a PDF: the browser's print dialog
+ * saves any page as one. Without this the sidebar, the top bar and the page's
+ * own buttons printed too, and in dark mode light text went onto white paper.
+ * The light tokens are restated for `body.dark` so a printout never follows the
+ * screen's theme.
+ */
+@media print {
+  body,
+  body.dark {
+    --bg: #fff;
+    --card: #fff;
+    --ink: #0f172a;
+    --hair: #d8dde6;
+    --tint: #fff;
+    --tint2: #f4f5f8;
+    --rail: #e6e9ef;
+    --ok: #0f7b4f;
+    --oksoft: #fff;
+    --oktint: #fff;
+    --warn: #b45309;
+    --warnsoft: #fff;
+    --warntint: #fff;
+    --bad: #be2a2a;
+    --badsoft: #fff;
+    --badtint: #fff;
+    --brand: #4f46e5;
+    --brand2: #6366f1;
+    --brandsoft: #fff;
+    --flag: #fff;
+    --flagline: #e6e9ef;
+    --sh1: none;
+    --sh2: none;
+    background: #fff;
+  }
+  .app {
+    display: block;
+  }
+  .side,
+  .top,
+  .skip,
+  .hd .r,
+  .eyebrow,
+  #toast {
+    display: none !important;
+  }
+  .card {
+    box-shadow: none;
+    break-inside: avoid;
+  }
+}
+
+/*
+ * A card in a two-column layout may be narrower than the table inside it.
+ * Below its breakpoint `.two` is one `1fr` column, and a grid item's minimum
+ * width is its content, so Turnaround's by-client table widened its card to
+ * 622px and took the page 248px into sideways scroll on a phone. With the
+ * minimum at zero, the table scrolls inside its card as every other one does.
+ */
+.two > * {
+  min-width: 0;
+}
+
+/* The screen shown while the session asks who is signed in. It used to be an
+ * empty div, which on a slow or hung connection read as a broken page. The
+ * fade waits 300ms so a fast answer never flashes it; under reduced motion the
+ * animation is off and it is simply shown. */
+.boot {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  font-size: var(--t-body);
+  color: var(--ink);
+  animation: boot-in 0.2s 0.3s both;
+}
+@keyframes boot-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* Design tokens exposed to Tailwind so utilities resolve to the design's palette. */

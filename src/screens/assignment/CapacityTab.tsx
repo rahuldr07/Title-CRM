@@ -2,7 +2,10 @@ import { useGo } from '@/lib/nav'
 import { useSession } from '@/state/session'
 import { routeNeeds } from '@/lib/permissions'
 import { BarRow, Btn, Card, Chip, Label } from '@/components/ui'
-import { AVAIL, STAFF } from '@/data/people'
+import { AVAIL } from '@/data/people'
+import { availOn } from '@/lib/leave'
+import { now } from '@/lib/clock'
+import type { Person } from '@/data/types'
 import { CAPACITY_AMBER, CAPACITY_RED, capacityTone } from '@/lib/metrics'
 import type { AssignmentBoard } from '@/lib/engine'
 
@@ -15,8 +18,12 @@ export function CapacityTab({ board }: { board: AssignmentBoard }) {
   const load = run.load
   const plan = run.assigns.filter((a) => a.today)
 
-  const rostered = STAFF.filter((s) => s.dep.length)
-  const available = rostered.filter((s) => s.avail === 'ok')
+  /* Today's availability — approved leave included — so this tab and attendance
+     say the same thing about the same person. */
+  const today = now()
+  const availOf = (s: Person) => availOn(s, today)
+  const rostered = run.ctx.staff.filter((s) => s.dep.length)
+  const available = rostered.filter((s) => availOf(s) === 'ok')
   const totalCap = available.reduce((a, s) => a + s.cap, 0)
 
   const atTarget = available.filter((s) => (load[s.id] ?? 0) >= s.cap)
@@ -104,14 +111,14 @@ export function CapacityTab({ board }: { board: AssignmentBoard }) {
               label={
                 <>
                   {s.n}
-                  {s.avail !== 'ok' ? (
+                  {availOf(s) !== 'ok' ? (
                     <>
                       {' '}
                       <span
-                        className={`chip ${AVAIL[s.avail][1]}`}
+                        className={`chip ${AVAIL[availOf(s)][1]}`}
                         style={{ fontSize: 'var(--t-eyebrow)', padding: '1px 7px' }}
                       >
-                        {AVAIL[s.avail][0]}
+                        {AVAIL[availOf(s)][0]}
                       </span>
                     </>
                   ) : null}
@@ -188,7 +195,7 @@ export function CapacityTab({ board }: { board: AssignmentBoard }) {
                       {Math.max(0, s.cap - total)}
                     </td>
                     <td>
-                      <Chip kind={AVAIL[s.avail][1]}>{AVAIL[s.avail][0]}</Chip>
+                      <Chip kind={AVAIL[availOf(s)][1]}>{AVAIL[availOf(s)][0]}</Chip>
                     </td>
                   </tr>
                 )

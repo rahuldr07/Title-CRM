@@ -299,3 +299,35 @@ describe('every screen gets the same answer', () => {
     expect(RULES.some((r) => r.k === 'route' && r.on)).toBe(true)
   })
 })
+
+/*
+ * Somebody on approved leave is not available, whatever their standing
+ * availability says. Attendance showed Satheesh N on leave while capacity showed
+ * him free and the run routed Search QC to him — two screens reading two
+ * different facts about one person on one day.
+ */
+describe('approved leave', () => {
+  const aug3 = new Date(2026, 7, 3, 12)
+  const aug4 = new Date(2026, 7, 4, 12)
+  const onLeave = (id: string, d: Date) => id === 'away' && d.getDate() === 3
+  const staff = [
+    person({ id: 'away', n: 'Away A', dep: ['Search'], cap: 50 }),
+    person({ id: 'here', n: 'Here H', dep: ['Search'], cap: 1 }),
+  ]
+  const world = ctx({ staff, onLeave, covStages: [] })
+  const order = { pr: 'LIEN', st: 'PA', cl: 'MGR', co: 'Cambria' }
+
+  it('takes a person off the day they are away', () => {
+    const r = narrowPool(order, 'Search', { ctx: world, target: false, on: aug3 })
+    expect(r.pool.map((p) => p.id)).toEqual(['here'])
+  })
+
+  it('puts them back the day after', () => {
+    const r = narrowPool(order, 'Search', { ctx: world, target: false, on: aug4 })
+    expect(r.pool.map((p) => p.id)).toContain('away')
+  })
+
+  it('reads approved leave by default', () => {
+    expect(typeof defaultContext().onLeave).toBe('function')
+  })
+})

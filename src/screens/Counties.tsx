@@ -6,6 +6,7 @@ import { ErrorBoundary } from '@/components/async'
 import { useNotBuilt } from '@/components/notBuilt'
 import { useUi } from '@/state/ui'
 import { useSession } from '@/state/session'
+import { webHref, countyName } from '@/lib/format'
 import { BADSTATES } from '@/data/catalog'
 import { LSTATE, brokenLinks, days, linkStats } from '@/lib/derived'
 import { csvName, downloadCSV } from '@/lib/csv'
@@ -80,7 +81,7 @@ function Counties() {
 
   const editCounty = (county: County | null) =>
     openModal({
-      title: county ? `${county.n} County, ${county.st}` : 'Add a county',
+      title: county ? `${countyName(county.n, county.st)}, ${county.st}` : 'Add a county',
       body: (
         <CountyEdit
           county={county}
@@ -151,13 +152,17 @@ function Counties() {
             <Btn variant="ghost" onClick={() => navigate({ to: '/linkcheck' })}>
               Link monitor
             </Btn>
-            <Btn
-              variant="ghost"
-              onClick={() => notBuilt('Importing a CSV', 'a file picker and a column mapper', exportCounties)}
-            >
-              Import CSV
-            </Btn>
-            <Btn onClick={() => editCounty(null)}>＋ Add county</Btn>
+            {isAdmin ? (
+              <>
+                <Btn
+                  variant="ghost"
+                  onClick={() => notBuilt('Importing a CSV', 'a file picker and a column mapper', exportCounties)}
+                >
+                  Import CSV
+                </Btn>
+                <Btn onClick={() => editCounty(null)}>＋ Add county</Btn>
+              </>
+            ) : null}
           </>
         }
       />
@@ -280,16 +285,35 @@ function Counties() {
                       const l = linkOf(c, t.k)
                       return (
                         <div className="cell" key={t.k}>
-                          <button
-                            type="button"
-                            style={{ font: 'inherit', textAlign: 'left' }}
-                            title={l.err || l.u || 'no link on file'}
-                            aria-label={`${t.n} for ${c.n} — ${LSTATE[l.s][0]}`}
-                            onClick={() => fixLink(c, t.k)}
-                          >
-                            <Chip kind={LSTATE[l.s][1]}>{LSTATE[l.s][0]}</Chip>
-                            {l.since ? <div className="s bad">{days(l.since)}d</div> : null}
-                          </button>
+                          {isAdmin ? (
+                            <button
+                              type="button"
+                              style={{ font: 'inherit', textAlign: 'left' }}
+                              title={l.err || l.u || 'no link on file'}
+                              aria-label={`${t.n} for ${c.n} — ${LSTATE[l.s][0]}`}
+                              onClick={() => fixLink(c, t.k)}
+                            >
+                              <Chip kind={LSTATE[l.s][1]}>{LSTATE[l.s][0]}</Chip>
+                              {l.since ? <div className="s bad">{days(l.since)}d</div> : null}
+                            </button>
+                          ) : (
+                            <>
+                              <Chip kind={LSTATE[l.s][1]}>{LSTATE[l.s][0]}</Chip>
+                              {l.since ? <div className="s bad">{days(l.since)}d</div> : null}
+                            </>
+                          )}
+                          {/* The research address itself, one click away for the searcher. */}
+                          {webHref(l.u) ? (
+                            <div className="s">
+                              <a href={webHref(l.u) ?? undefined} target="_blank" rel="noopener noreferrer">
+                                Open<span aria-hidden="true"> ↗</span>
+                                <span className="sr-only">
+                                  {' '}
+                                  {t.n} for {c.n} (opens in a new tab)
+                                </span>
+                              </a>
+                            </div>
+                          ) : null}
                         </div>
                       )
                     })}

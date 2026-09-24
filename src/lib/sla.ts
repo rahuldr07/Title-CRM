@@ -6,7 +6,7 @@ export { SLA }
 export type { SlaRule }
 import { hrs, r2 } from '@/lib/format'
 import { now } from '@/lib/clock'
-import type { Assignments, Order, Tier } from '@/data/types'
+import type { Assignments, Order, OrderStatus, Tier } from '@/data/types'
 
 export const isDefaultRule = (r: SlaRule) => r.cl.startsWith('—')
 
@@ -63,19 +63,24 @@ export interface Checkpoint {
 
 const cpCache = new Map<string, Checkpoint[]>()
 
+/** Each stage's slice of a promise: the promise less the buffer, split by the shares, cumulative. */
+export function stageWindows(slaH: number, buffer: number, shares: Record<string, number>): Checkpoint[] {
+  const win = slaH * (1 - buffer / 100)
+  let cum = 0
+  return ASSIGN_STAGES.map((st) => {
+    const h = (win * (shares[st] ?? 0)) / 100
+    cum += h
+    return { stage: st, pct: shares[st] ?? 0, hours: h, by: cum }
+  })
+}
+
 export function checkpoints(slaH: number, pr: string): Checkpoint[] {
   const sh = sharesFor(pr)
   const buffer = currentBudget().buffer
   const key = `${slaH}|${pr}|${buffer}|${JSON.stringify(sh)}`
   const hit = cpCache.get(key)
   if (hit) return hit
-  const win = slaH * (1 - buffer / 100)
-  let cum = 0
-  const out = ASSIGN_STAGES.map((st) => {
-    const h = (win * (sh[st] ?? 0)) / 100
-    cum += h
-    return { stage: st, pct: sh[st] ?? 0, hours: h, by: cum }
-  })
+  const out = stageWindows(slaH, buffer, sh)
   cpCache.set(key, out)
   return out
 }
@@ -83,12 +88,34 @@ export function checkpoints(slaH: number, pr: string): Checkpoint[] {
 export type Plannable = Pick<Order, 'cl' | 'pr' | 'recv'> & {
   done?: boolean
   a?: Assignments
+  stt?: OrderStatus
 }
+
+/** The status an order carries while it is at each stage. */
+export const STAGE_STATUS: Record<string, OrderStatus> = {
+  Search: 'search',
+  'Search QC': 'sq',
+  Typing: 'typing',
+  'Typing QC': 'tqc',
+  RTS: 'rts',
+  'Doc Req': 'docreq',
+}
+
+const PAST_EVERY_STAGE: OrderStatus[] = ['upload', 'sent']
 
 const ownersOf = (o: Plannable) => o.a ?? {}
 
+/* The status decides where an order is. Seed orders are staffed ahead, so the
+   last stage with a person on it said RTS for an order whose status said Search,
+   and the header and the checkpoints contradicted each other. The assignments
+   decide only for a record with no status, or one on an exception branch. */
 export function curIdx(o: Plannable): number {
   if (o.done) return ASSIGN_STAGES.length
+  if (o.stt) {
+    if (PAST_EVERY_STAGE.includes(o.stt)) return ASSIGN_STAGES.length
+    const at = ASSIGN_STAGES.findIndex((st) => STAGE_STATUS[st] === o.stt)
+    if (at >= 0) return at
+  }
   const own = ownersOf(o)
   let last = -1
   ASSIGN_STAGES.forEach((st, i) => {

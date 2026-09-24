@@ -16,7 +16,10 @@ import { LNKIND, LNSTATUS } from '@/data/loans'
 import { STAFF } from '@/data/people'
 import { whoName } from '@/lib/permissions'
 import { inr } from '@/lib/payroll'
-import { fmtDT } from '@/lib/format'
+import { TZ, fmtDT } from '@/lib/format'
+
+/* Every time carries its zone: for staff in India a bare time is a 9.5-hour misreading. */
+const at = (d: Date) => `${fmtDT(d)} ${TZ}`
 import { useGo } from '@/lib/nav'
 import { activityFor, outstanding, scheduleFor } from '@/lib/loans'
 import { useLoanConfirm } from './loans/confirm'
@@ -60,7 +63,7 @@ export default function LoanDetail() {
 
   const timeline: TimelineEntry[] = activity.map((a, i) => ({
     id: `${a.kind}-${i}`,
-    when: fmtDT(a.at),
+    when: at(a.at),
     who: a.kind === 'event' ? whoName(a.event!.by) : `Payroll — ${a.payment!.mn}`,
     what:
       a.kind === 'event'
@@ -113,14 +116,14 @@ export default function LoanDetail() {
               ['EMI', inr(loan.emi)],
               ['Paid so far', inr(loan.paid)],
               ['Balance', inr(outstanding(loan))],
-              ['Requested', fmtDT(loan.reqAt)],
+              ['Requested', at(loan.reqAt)],
               ...(loan.decidedBy
-                ? ([['Decided by', `${whoName(loan.decidedBy)} · ${loan.decidedAt ? fmtDT(loan.decidedAt) : '—'}`]] as [
+                ? ([['Decided by', `${whoName(loan.decidedBy)} · ${loan.decidedAt ? at(loan.decidedAt) : '—'}`]] as [
                     string,
                     string,
                   ][])
                 : []),
-              ...(loan.takenOn ? ([['Disbursed', fmtDT(loan.takenOn)]] as [string, string][]) : []),
+              ...(loan.takenOn ? ([['Disbursed', at(loan.takenOn)]] as [string, string][]) : []),
               ['Purpose', loan.note],
             ]}
           />

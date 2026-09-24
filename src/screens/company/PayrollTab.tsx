@@ -1,6 +1,7 @@
 import { Assumption, Banner, Card, DetailRow, Label } from '@/components/ui'
 import { PAYMONTHS } from '@/data/hrms'
-import { inr, payTotals } from '@/lib/payroll'
+import { fyOf, inr, payTotals } from '@/lib/payroll'
+import { now } from '@/lib/clock'
 import { setPayCfg, useCompany } from '@/state/company'
 import type { PayConfig } from '@/data/types'
 
@@ -65,6 +66,7 @@ export function PayrollTab() {
     ['Employee deductions', t.ded],
     ['Net payable', t.net],
     ['Employer PF', t.erpf],
+    ['Employer ESI', t.esiEr],
     ['Gratuity provisioned', gratuity],
   ]
 
@@ -234,10 +236,10 @@ export function PayrollTab() {
         </Card>
       </div>
 
-      <Assumption title="Tax slabs are the new regime, FY 2025-26">
-        The arithmetic is right and the rates are current, but real TDS depends on declarations,
-        other income and prior employment. <b>Have your provider confirm before anyone is paid on
-        these figures.</b>
+      <Assumption title={`Tax slabs are the new regime as notified for FY 2025-26 — it is now ${fyOf(now())}`}>
+        If the slabs changed for the current year, the TDS here is out by the difference. Real TDS
+        also depends on declarations, other income and prior employment. <b>Have your provider
+        confirm before anyone is paid on these figures.</b>
       </Assumption>
     </>
   )

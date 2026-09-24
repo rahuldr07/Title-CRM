@@ -16,8 +16,26 @@ export class ApiError extends Error {
   }
 }
 
+/* The session waits on a request before it shows anything, so a connection that
+   hangs rather than refusing — a closed port on some machines, a firewall, a VPN —
+   would otherwise hold the app on a blank screen for good. */
+export const REQUEST_TIMEOUT_MS = 8_000
+
+async function send(url: string, init: RequestInit): Promise<Response> {
+  const abort = new AbortController()
+  const timer = setTimeout(() => abort.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    return await fetch(url, { ...init, signal: abort.signal })
+  } catch (e) {
+    if (abort.signal.aborted) throw new ApiError(0, 'The server did not answer in time.')
+    throw e
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 async function request<T>(path: string, tenantId: string | null, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  const res = await send(`/api${path}`, {
     ...init,
     credentials: 'include',
     headers: {
@@ -78,7 +96,7 @@ export const fetchMemberships = (tenantId: string | null) =>
 /* `rememberMe: false` is Better Auth's own switch for a session cookie that
    ends with the browser rather than one that outlives it. */
 export async function startSession(email: string, password: string, rememberMe = true): Promise<void> {
-  const res = await fetch('/api/auth/sign-in/email', {
+  const res = await send('/api/auth/sign-in/email', {
     method: 'POST',
     credentials: 'include',
     headers: { 'content-type': 'application/json' },
@@ -95,5 +113,5 @@ export async function startSession(email: string, password: string, rememberMe =
 }
 
 export async function endSession(): Promise<void> {
-  await fetch('/api/auth/sign-out', { method: 'POST', credentials: 'include' }).catch(() => null)
+  await send('/api/auth/sign-out', { method: 'POST', credentials: 'include' }).catch(() => null)
 }

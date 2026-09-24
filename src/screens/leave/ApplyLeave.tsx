@@ -8,7 +8,9 @@ import { now } from '@/lib/clock'
 import type { Leave } from '@/data/types'
 import { iso, parseIso } from '@/lib/format'
 
-const LENGTHS = [1, 2, 3, 4, 5, 7, 10, 14]
+/* Every length up to a month. The list jumped 5 → 7 → 10 → 14, so six, eight or
+   nine days of leave could not be asked for at all. */
+const LENGTHS = Array.from({ length: 30 }, (_, i) => i + 1)
 
 function NoteBanner({ note }: { note: Note }) {
   if (note.kind === 'plain') {
@@ -119,7 +121,8 @@ export function ApplyLeave({
             {LEAVETYPES.map((t) => (
               <option key={t.k} value={t.k}>
                 {t.n}
-                {t.annual ? ` — ${balance[t.k]?.left ?? 0} left` : ''}
+                {/* Comp off is earned, not granted yearly, so a balance shows for any type with days to its name. */}
+                {t.annual || (balance[t.k]?.earned ?? 0) > 0 ? ` — ${balance[t.k]?.left ?? 0} left` : ''}
               </option>
             ))}
           </select>

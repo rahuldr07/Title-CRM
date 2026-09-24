@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useGo } from '@/lib/nav'
+import { useGo, useMayOpen } from '@/lib/nav'
 import { Banner, Btn, Card, Chip, Empty, Label } from '@/components/ui'
 import { qualityCsv } from '@/lib/report-csv'
 import { useReportExport } from '@/state/reportExport'
@@ -51,6 +51,7 @@ function Scores({
   const [person, setPerson] = useState<string | null>(null)
 
   const toBudgets = () => navigate({ to: '/company', search: { tab: 'Turnaround & SLA' } })
+  const mayOpenCompany = useMayOpen('company')
 
   const r = resolveRange(range)
   const dels = useMemo(() => deliveries.filter((x) => inRange(x.d, r)), [deliveries, r])
@@ -307,9 +308,11 @@ function Scores({
               icon="⚑"
               title={weak.map(([k, v]) => `${k} is missed by everyone ${100 - v.rate}% of the time`).join(' · ')}
               actions={
-                <Btn variant="ghost" small onClick={toBudgets}>
-                  Stage budgets
-                </Btn>
+                mayOpenCompany ? (
+                  <Btn variant="ghost" small onClick={toBudgets}>
+                    Stage budgets
+                  </Btn>
+                ) : undefined
               }
             >
               When a whole department misses its budget this often, it is the budget or the staffing that is

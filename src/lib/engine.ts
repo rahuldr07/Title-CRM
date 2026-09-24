@@ -1,22 +1,16 @@
 import { ASSIGN_STAGES, PAIRS, RULES, STAGES } from '@/data/org'
 import { PRODUCTS } from '@/data/catalog'
-import { STAFF } from '@/data/people'
 import { COUNTIES } from '@/data/catalog'
 import { PRODMIX, CLIENTMIX } from '@/data/production'
 import { fmtDate } from './format'
 import { now } from '@/lib/clock'
 import { COVSTAGES, coversPlace, coversProduct } from './qualification'
-import type { Order, OrderStatus, Person, Rule, RuleCondition } from '@/data/types'
+import type { Order, Person, Rule, RuleCondition } from '@/data/types'
 import { midnight } from '@/lib/format'
+import { STAGE_STATUS } from '@/lib/sla'
+import { onLeaveOn } from '@/lib/leave'
+import { currentStaff } from '@/state/company'
 
-const STAGE_STATUS: Record<string, OrderStatus> = {
-  Search: 'search',
-  'Search QC': 'sq',
-  Typing: 'typing',
-  'Typing QC': 'tqc',
-  RTS: 'rts',
-  'Doc Req': 'docreq',
-}
 
 export interface RunContext {
   staff: Person[]
@@ -27,10 +21,15 @@ export interface RunContext {
   covStages: string[]
   coversPlace: (id: string, state: string, county: string | null) => boolean
   coversProduct: (id: string, product: string) => boolean
+  /* Approved leave on a day. Standing availability alone let the run route work
+     to someone attendance showed as away. */
+  onLeave: (id: string, d: Date) => boolean
 }
 
+/* The roster from the company store, so availability set on the staff form is the
+   one the run reads. */
 export const defaultContext = (): RunContext => ({
-  staff: STAFF,
+  staff: currentStaff(),
   rules: RULES,
   assignStages: ASSIGN_STAGES,
   stages: STAGES,
@@ -38,7 +37,12 @@ export const defaultContext = (): RunContext => ({
   covStages: COVSTAGES,
   coversPlace,
   coversProduct,
+  onLeave: onLeaveOn,
 })
+
+/** Free to take work on a day: available, active, and not on approved leave. */
+const freeOn = (cx: RunContext, s: Person, d: Date) =>
+  s.avail === 'ok' && s.active !== false && !cx.onLeave(s.id, d)
 
 export const DAYCOUNT = 5
 
@@ -198,6 +202,8 @@ export interface NarrowOptions {
   load?: Record<string, number>
   taken?: Record<string, string | null | undefined>
   target?: boolean
+  /** The day being placed for; today unless the run says otherwise. */
+  on?: Date
 }
 
 export function narrowPool(o: Candidate, stage: string, opts: NarrowOptions = {}): NarrowResult {
@@ -251,7 +257,8 @@ export function narrowPool(o: Candidate, stage: string, opts: NarrowOptions = {}
 
   if (ruleOn('r2', cx.rules)) {
     const before = pool.length
-    pool = pool.filter((s) => s.avail === 'ok' && s.active !== false)
+    const day = opts.on ?? now()
+    pool = pool.filter((s) => freeOn(cx, s, day))
     step('r2', before, pool.length, `availability — ${before} → ${pool.length}`)
   }
   if (!pool.length) return stop('unavailable', 'r2')
@@ -265,7 +272,7 @@ export function narrowPool(o: Candidate, stage: string, opts: NarrowOptions = {}
 
   if (ruleOn('r4', cx.rules) && paired) {
     const before = pool.length
-    pool = pool.filter((s) => taken[paired] !== s.id)
+    pool = pool.filter((s) => !wouldSelfReview(taken, stage, s.id))
     step('r4', before, pool.length, `self-review — skipped ${whoName(taken[paired])}`)
   }
 
@@ -335,8 +342,8 @@ export function runDay(days: DayBucket[], overrides: Partial<RunContext> = {}): 
   const deptOut = [
     ...new Set(
       cx.stages.filter((g) => {
-        const m = STAFF.filter((s) => s.dep.includes(g))
-        return m.length > 0 && m.every((s) => s.avail !== 'ok')
+        const m = cx.staff.filter((s) => s.dep.includes(g))
+        return m.length > 0 && m.every((s) => !freeOn(cx, s, now()))
       }),
     ),
   ]
@@ -356,7 +363,7 @@ export function runDay(days: DayBucket[], overrides: Partial<RunContext> = {}): 
 
         for (const stage of ASSIGN_STAGES) {
           const from = trace.length
-          const nar = narrowPool(o, stage, { ctx: cx, load, taken: onOrder })
+          const nar = narrowPool(o, stage, { ctx: cx, load, taken: onOrder, on: o.recv })
 
           nar.steps.forEach((s) => {
             bump(fired, s.r)
@@ -465,6 +472,17 @@ function previewErr(o: Candidate, { why, rule }: NarrowStop): string {
   }
 }
 
+/* Self-review is structural: a QC stage never goes to the author of the stage it
+   checks. The engine, the order page and the exceptions tab all ask this. */
+export function wouldSelfReview(
+  assign: Readonly<Record<string, string | null | undefined>>,
+  stage: string,
+  personId: string,
+): string | null {
+  const paired = PAIRS[stage]
+  return paired && assign[paired] === personId ? paired : null
+}
+
 export const STAGE_HOURS = 1.5
 
 const stageIdx = (s: string) => ASSIGN_STAGES.indexOf(s)
@@ -537,7 +555,7 @@ export function deptWork(run: RunResult): Record<string, DeptRow> {
   const m: Record<string, DeptRow> = {}
   run.ctx.stages.forEach((d) => {
     const staff = run.ctx.staff.filter((s) => s.dep.includes(d))
-    const free = staff.filter((s) => s.avail === 'ok')
+    const free = staff.filter((s) => freeOn(run.ctx, s, now()))
     m[d] = {
       d,
       done: 0,
@@ -596,6 +614,7 @@ export interface AssignmentBoard {
 }
 
 let memo: AssignmentBoard | null = null
+let memoStaff: Person[] | null = null
 
 export function computeBoard(overrides: Partial<RunContext> = {}): AssignmentBoard {
   const day = makeDay()
@@ -618,13 +637,20 @@ export function computeBoard(overrides: Partial<RunContext> = {}): AssignmentBoa
   }
 }
 
+/* Recomputed when the roster changes, so a staff edit reaches the run without
+   each screen having to remember to drop it. */
 export function board(): AssignmentBoard {
-  if (!memo) memo = computeBoard()
+  const staff = currentStaff()
+  if (!memo || memoStaff !== staff) {
+    memo = computeBoard()
+    memoStaff = staff
+  }
   return memo
 }
 
 export function resetBoard(): void {
   memo = null
+  memoStaff = null
 }
 
 export const EXCLUSION: Record<ExclusionReason, [string, 'warn' | 'bad', string]> = {

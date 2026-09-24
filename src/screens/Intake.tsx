@@ -38,7 +38,8 @@ function MailCard({ m }: { m: MailItem }) {
           style={{
             padding: '11px 20px',
             background: 'var(--badsoft)',
-            borderBottom: '1px solid #F3CFCF',
+            /* Mixed from the token, so the line follows dark mode as the fill beside it does. */
+            borderBottom: '1px solid color-mix(in srgb, var(--bad) 22%, transparent)',
             fontSize: 'var(--t-small)',
             color: 'var(--bad)',
             fontWeight: 500,
@@ -68,7 +69,13 @@ function MailCard({ m }: { m: MailItem }) {
 
         <div style={{ display: 'flex', gap: 8, marginTop: 15, flexWrap: 'wrap' }}>
           {m.st === 'ready' ? (
-            <Btn onClick={() => navigate({ to: '/orders/new' })}>Review &amp; create order</Btn>
+            <Btn
+              onClick={() =>
+                navigate({ to: '/orders/new', search: { mail: m.x.find(([k]) => k === 'Order no')?.[1] } })
+              }
+            >
+              Review &amp; create order
+            </Btn>
           ) : m.st === 'attach' && m.match ? (
             <Btn
               variant="ghost"

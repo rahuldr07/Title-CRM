@@ -3,8 +3,9 @@ import { useGo } from '@/lib/nav'
 import { Btn, Card, Kpi, Kpis, PageHead, SectionHead, focusSection } from '@/components/ui'
 import { LoanCard } from '@/components/LoanCard'
 import { useSession } from '@/state/session'
-import { PAYMONTHS, PAYRUNS } from '@/data/hrms'
-import { inr, payslipOf, ytd } from '@/lib/payroll'
+import { PAYMONTHS } from '@/data/hrms'
+import { useRuns } from '@/state/payruns'
+import { fyOfPayMonth, inr, payslipOf, ytd } from '@/lib/payroll'
 import { usePayslipDownloads } from './payslips/usePayslipDownloads'
 
 const COLS = '150px 140px 140px 140px 1fr'
@@ -14,8 +15,9 @@ export default function MyPayslips() {
   const navigate = useGo()
   const download = usePayslipDownloads()
 
-  const published = useMemo(() => PAYMONTHS.filter((m) => PAYRUNS[m]?.published).reverse(), [])
-  const pending = useMemo(() => PAYMONTHS.filter((m) => !PAYRUNS[m]?.published), [])
+  const runs = useRuns()
+  const published = useMemo(() => PAYMONTHS.filter((m) => runs[m]?.published).reverse(), [runs])
+  const pending = useMemo(() => PAYMONTHS.filter((m) => !runs[m]?.published), [runs])
 
   const openPayslip = (month: string) =>
     navigate({ to: '/payslips/$personId', params: { personId: me.id }, search: { m: month } })
@@ -73,13 +75,12 @@ export default function MyPayslips() {
             valueTone="warn"
             valueSize="var(--t-h1)"
             detail={`of which ${inr(year.tds)} tax`}
-            flat
           />
           <Kpi
             title="Received this year"
             value={inr(year.net)}
             valueSize="var(--t-h1)"
-            detail={`across ${published.length} month${published.length === 1 ? '' : 's'}`}
+            detail={`${year.months} month${year.months === 1 ? '' : 's'} of ${fyOfPayMonth(newest)}`}
             chevron
             hint="Month by month"
             onClick={() => focusSection('mpList')}

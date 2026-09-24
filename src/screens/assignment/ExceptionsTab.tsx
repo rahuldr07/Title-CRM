@@ -4,15 +4,22 @@ import { Btn, Card, Chip, Empty } from '@/components/ui'
 import { useUi } from '@/state/ui'
 import { useSession } from '@/state/session'
 import { AVAIL, STAFF } from '@/data/people'
-import { ASSIGN_STAGES, PAIRS } from '@/data/org'
+import { ASSIGN_STAGES } from '@/data/org'
 import { COVSTAGES } from '@/lib/qualification'
 import { routeNeeds, whoName } from '@/lib/permissions'
 import { covOK } from '@/lib/ruleText'
-import { EXCLUSION, type AssignmentBoard, type Exception, type ExclusionReason } from '@/lib/engine'
+import {
+  EXCLUSION,
+  wouldSelfReview,
+  type AssignmentBoard,
+  type Exception,
+  type ExclusionReason,
+} from '@/lib/engine'
+import { openExceptions, orderAsEdited, orderById, setAssignee, useOrderState } from '@/state/orders'
 
 const REMEDY: Record<ExclusionReason, string> = {
   capacity: 'Raising a target or adding someone to the department clears all of these.',
-  self: 'The person free for the QC is the one who did the work. Assign someone else or accept the pairing knowingly.',
+  self: 'The person free for the QC is the one who did the work, and nobody checks their own. Assign someone else from the department.',
   unavailable: 'Everyone in that department is on leave or off shift today.',
   coverage:
     'This is not a roster problem — the people are there, they are simply not qualified for that state, county or product. Widening somebody’s coverage clears the whole group.',
@@ -25,6 +32,15 @@ const COLS = '40px 150px 120px 130px 1fr'
 
 const key = (e: Exception) => `${e.o.id}|${e.stage}`
 
+/* A group can hold several stages, so its description counts them rather than
+   quoting the first row — which labelled a mixed group of seventeen "Typing". */
+function stagesIn(list: Exception[]): string {
+  const n = list.reduce<Record<string, number>>((acc, e) => ({ ...acc, [e.stage]: (acc[e.stage] ?? 0) + 1 }), {})
+  return ASSIGN_STAGES.filter((st) => n[st])
+    .map((st) => `${st} ×${n[st]}`)
+    .join(', ')
+}
+
 export function ExceptionsTab({
   board,
   onTab,
@@ -33,14 +49,15 @@ export function ExceptionsTab({
   onTab: (t: 'Rules') => void
 }) {
   const navigate = useGo()
-  const { can } = useSession()
+  const { can, me } = useSession()
   const companyNeeds = routeNeeds('company')
   const mayOpenCompany = !companyNeeds || can(companyNeeds)
   const { toast, openModal, closeModal } = useUi()
-  const [placed, setPlaced] = useState<Record<string, string>>({})
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  useOrderState()
 
   const { run } = board
-  const exc = run.exc.filter((e) => e.today)
+  const exc = openExceptions()
   const orders = run.today
   const total = orders.length * ASSIGN_STAGES.length
 
@@ -53,28 +70,26 @@ export function ExceptionsTab({
 
   const assign = (e: Exception, id: string) => {
     if (!id) return
-    const paired = PAIRS[e.stage]
-    const author = paired ? e.o.plan?.[paired] : undefined
-    if (author && author === id) {
+    const order = orderById(e.o.id)
+    const paired = wouldSelfReview(order ? orderAsEdited(order).a : (e.o.plan ?? {}), e.stage, id)
+    if (paired) {
       openModal({
         title: 'That would be self-review',
         body: (
-          <>
-            <p style={{ fontSize: 'var(--t-body)' }}>
-              <b>{whoName(id)}</b> did the {paired} on this order. Checking their own work is the one
-              thing the QC score cannot survive.
-            </p>
-            <p className="gr" style={{ fontSize: 'var(--t-small)' }}>
-              Pick someone else, or turn the rule off under Rules if that is genuinely how you work.
-            </p>
-          </>
+          <p style={{ fontSize: 'var(--t-body)' }}>
+            <b>{whoName(id)}</b> did the {paired} on this order, and nobody checks their own work.
+            Pick someone else from {e.stage}.
+          </p>
         ),
         footer: <Btn onClick={closeModal}>Pick someone else</Btn>,
       })
       return
     }
-    setPlaced((p) => ({ ...p, [key(e)]: id }))
-    toast(`${e.stage} → ${whoName(id)}`)
+    setAssignee(e.o.id, e.stage, id, me.n)
+    const left = exc.length - 1
+    toast(
+      `${e.o.id} ${e.stage} → ${whoName(id)} · ${left ? `${left} still need a person` : 'every stage is placed'}`,
+    )
   }
 
   return (
@@ -150,7 +165,7 @@ export function ExceptionsTab({
               </div>
               <div className="cb" style={{ paddingBottom: 0 }}>
                 <p className="gr" style={{ fontSize: 'var(--t-small)', marginBottom: 13 }}>
-                  {list[0].t}. {REMEDY[why as ExclusionReason]}
+                  {stagesIn(list)}. {REMEDY[why as ExclusionReason]}
                 </p>
               </div>
               <div className="tsc">
@@ -163,8 +178,7 @@ export function ExceptionsTab({
                     <span>What you can do</span>
                   </div>
                   <div className="tb">
-                    {list.slice(0, SHOWN_PER_CAUSE).map((e, ei) => {
-                      const chosen = placed[key(e)]
+                    {list.slice(0, expanded[why] ? list.length : SHOWN_PER_CAUSE).map((e, ei) => {
                       const options = STAFF.filter(
                         (s) => s.dep.includes(e.stage) && s.active !== false,
                       ).sort((a, b) => Number(covOK(b.id, e)) - Number(covOK(a.id, e)))
@@ -201,7 +215,7 @@ export function ExceptionsTab({
                                 className="inp"
                                 style={{ width: '100%' }}
                                 aria-label={`Assign ${e.o.id} ${e.stage} manually`}
-                                value={chosen ?? ''}
+                                value=""
                                 onChange={(ev) => assign(e, ev.target.value)}
                               >
                                 <option value="">— assign anyway —</option>
@@ -222,28 +236,24 @@ export function ExceptionsTab({
                                   not {e.o.co}
                                 </div>
                               ) : null}
-                              {chosen ? (
-                                <div className="s ok" style={{ marginTop: 5 }}>
-                                  Placed by hand with {whoName(chosen)} — not written back to the run.
-                                </div>
-                              ) : null}
                             </div>
-                            <Btn
-                              variant="ghost"
-                              small
-                              onClick={() => toast('Held for tomorrow’s batch')}
-                            >
-                              Defer
-                            </Btn>
                           </div>
                         </div>
                       )
                     })}
                     {list.length > SHOWN_PER_CAUSE ? (
                       <div className="trow" style={{ gridTemplateColumns: '1fr' }}>
-                        <div className="cell gr" style={{ fontSize: 'var(--t-small)', padding: '4px 0' }}>
-                          + {list.length - SHOWN_PER_CAUSE} more of the same kind — fixing the cause
-                          above clears them together.
+                        <div className="cell" style={{ padding: '6px 0' }}>
+                          <Btn
+                            variant="ghost"
+                            small
+                            aria-expanded={!!expanded[why]}
+                            onClick={() => setExpanded((x) => ({ ...x, [why]: !x[why] }))}
+                          >
+                            {expanded[why]
+                              ? 'Show fewer'
+                              : `Show ${list.length - SHOWN_PER_CAUSE} more of the same kind`}
+                          </Btn>
                         </div>
                       </div>
                     ) : null}

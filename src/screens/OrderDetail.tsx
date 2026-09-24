@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams } from '@tanstack/react-router'
-import { useGo } from '@/lib/nav'
+import { useGo, useMayOpen } from '@/lib/nav'
 import {
   Avatar,
   Banner,
@@ -25,13 +25,17 @@ import { useQcRules } from '@/state/qcRules'
 import { useRules } from '@/state/rules'
 import { CostForm } from './orders/CostForm'
 import { DefectForm } from './orders/DefectForm'
+import { WebLink } from '@/components/WebLink'
 import {
   addCost,
   addDoc,
   addNote,
+  finishStage,
   docsOf,
   markRated,
   orderAsEdited,
+  orderById,
+  partiesOf,
   setAssignee,
   setAssignments,
   setDoc,
@@ -40,28 +44,17 @@ import {
   workingOn,
   type OrderEdits,
 } from '@/state/orders'
-import { ORDERS } from '@/data/production'
 import { PRODUCTS, COUNTIES, LINKTYPES, LINKCHECK, BADSTATES } from '@/data/catalog'
 import { ASSIGN_STAGES, PAIRS, STAGES, STATUS } from '@/data/org'
 import { AVAIL, STAFF } from '@/data/people'
 import { BUDGET } from '@/data/budget'
-import {
-  LOCAL_OFFSET_H,
-  TZ,
-  TZ2,
-  fmtDT,
-  fmtDate,
-  hrs,
-  money,
-  orderChipKind,
-  orderState,
-} from '@/lib/format'
+import { LOCAL_OFFSET_H, TZ, TZ2, fmtDT, fmtDate, money, orderChipKind, orderState, countyName } from '@/lib/format'
 import { now } from '@/lib/clock'
 import { whoName } from '@/lib/permissions'
 import { LSTATE, days } from '@/lib/derived'
 import { QC_CRITERIA, QC_SCALE } from '@/lib/quality'
-import { arrivalAsOrder, arrivalById, board, narrowPool } from '@/lib/engine'
-import { SLA, hh, orderPlan, slaHours } from '@/lib/sla'
+import { board, narrowPool, wouldSelfReview } from '@/lib/engine'
+import { SLA, curStageOf, hh, orderPlan } from '@/lib/sla'
 import type { Assignments, OrderStatus } from '@/data/types'
 
 const st = (k: string) => STATUS[k]?.[0] ?? k
@@ -88,6 +81,7 @@ export default function OrderDetail() {
   const { orderId } = useParams({ from: '/orders/$orderId' })
   const navigate = useGo()
   const { me, can } = useSession()
+  const mayOpenCompany = useMayOpen('company')
   const { toast, openModal, closeModal } = useUi()
   const notBuilt = useNotBuilt()
   const qcRules = useQcRules()
@@ -97,18 +91,13 @@ export default function OrderDetail() {
 
   useOrderState()
 
-  const arrival = arrivalById(orderId)
-  const base =
-    ORDERS.find((x) => x.id === orderId) ??
-    (arrival ? arrivalAsOrder(arrival, slaHours(arrival)) : undefined)
+  const base = orderById(orderId)
 
   if (!base) {
     return (
       <>
-        <Btn variant="ghost" small style={{ marginBottom: 14 }} onClick={() => navigate({ to: '/orders', search: lastOrdersView() })}>
-          ← Orders
-        </Btn>
         <PageHead
+          parent={{ to: '/orders', label: 'Orders', search: lastOrdersView() }}
           title="That order is not here"
           sub="It may have been removed, or the link may be out of date."
         />
@@ -135,10 +124,7 @@ export default function OrderDetail() {
   if (!can('all') && !Object.values(assign).includes(me.id)) {
     return (
       <>
-        <Btn variant="ghost" small style={{ marginBottom: 14 }} onClick={() => navigate({ to: '/mywork' })}>
-          ← My work
-        </Btn>
-        <PageHead title="Not one of yours" sub={`${me.n} is not on any stage of ${o.id}.`} />
+        <PageHead parent={{ to: '/mywork', label: 'My work' }} title="Not one of yours" sub={`${me.n} is not on any stage of ${o.id}.`} />
         <Card padded style={{ maxWidth: 560 }}>
           <p style={{ fontSize: 'var(--t-body)', margin: 0 }}>
             Your account sees the orders you are working. If this one should be yours, whoever runs
@@ -163,39 +149,33 @@ export default function OrderDetail() {
   const ratingRequired = qcRules.find((r) => r.k === 'mand')?.on ?? false
   const overdueBy = Math.abs(Math.round((o.due.getTime() - now().getTime()) / 3600000))
 
-  const where = [o.prop, `${o.co} County`, o.st].filter(Boolean).join(', ')
+  const parties = partiesOf(base, w)
 
   const field = <K extends keyof OrderEdits>(key: K, value: OrderEdits[K]) =>
-    setOrderField(o.id, key, value)
+    setOrderField(o.id, key, value, me.n)
 
   const setStage = (stage: string, value: string) => {
     if (!value) return
     if (value === '__clear') {
-      setAssignee(o.id, stage, null)
+      setAssignee(o.id, stage, null, me.n)
       toast(`${stage} unassigned`)
       return
     }
-    const paired = PAIRS[stage]
-    if (paired && assign[paired] === value) {
+    const paired = wouldSelfReview(assign, stage, value)
+    if (paired) {
       openModal({
         title: 'That would be self-review',
         body: (
-          <>
-            <p style={{ fontSize: 'var(--t-body)' }}>
-              <b>{whoName(value)}</b> did the {paired} on this order. Checking their own work is the
-              one thing the QC score cannot survive.
-            </p>
-            <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 10 }}>
-              Pick someone else, or turn the rule off under Quality → How scoring works if that is
-              genuinely how you work.
-            </p>
-          </>
+          <p style={{ fontSize: 'var(--t-body)' }}>
+            <b>{whoName(value)}</b> did the {paired} on this order, and nobody checks their own work.
+            Pick someone else from {stage}.
+          </p>
         ),
         footer: <Btn onClick={closeModal}>Pick someone else</Btn>,
       })
       return
     }
-    setAssignee(o.id, stage, value)
+    setAssignee(o.id, stage, value, me.n)
     toast(`${stage} → ${whoName(value)}`)
   }
 
@@ -260,7 +240,7 @@ export default function OrderDetail() {
           <Btn
             onClick={() => {
               const n = preview.filter((p) => p.person).length
-              setAssignments(o.id, taken)
+              setAssignments(o.id, taken, me.n)
               closeModal()
               toast(`${n} stage${n === 1 ? '' : 's'} assigned`)
             }}
@@ -313,6 +293,23 @@ export default function OrderDetail() {
     toast('Note added')
   }
 
+  const stageNow = o.done ? null : curStageOf(o)
+  const mine = !!stageNow && assign[stageNow] === me.id
+  const mayFinish = !!stageNow && (mine || can('assign'))
+
+  const finish = () => {
+    const r = finishStage(o.id, me.n, ratingRequired)
+    if (r.done) {
+      toast(r.to === 'Sent' ? `${r.from} finished — ${o.id} sent to the client` : `${r.from} finished — handed to ${r.to}`)
+      return
+    }
+    openModal({
+      title: `${stageNow ?? 'This stage'} is not finished yet`,
+      body: <p style={{ fontSize: 'var(--t-body)' }}>{r.why}</p>,
+      footer: <Btn onClick={closeModal}>OK</Btn>,
+    })
+  }
+
   const save = () => {
     const n = Object.keys(w.edits).length
     toast(
@@ -324,26 +321,30 @@ export default function OrderDetail() {
 
   return (
     <>
-      <Btn variant="ghost" small style={{ marginBottom: 14 }} onClick={() => navigate({ to: '/orders', search: lastOrdersView() })}>
-        ← Orders
-      </Btn>
-
+      {/* One way back, as the other detail pages have it: the crumb returns to the
+          Orders view this came from; the top bar's arrow goes home. */}
       <PageHead
+        parent={{ to: '/orders', label: 'Orders', search: lastOrdersView() }}
         title={o.prop || o.id}
-        sub={`${o.id} · ${o.cl} · ${o.pr} · ${o.co} County, ${o.st}`}
+        sub={`${o.id} · ${o.cl} · ${o.pr} · ${countyName(o.co, o.st)}, ${o.st}`}
         actions={
           <>
             <Chip kind={orderChipKind(o)}>{st(o.stt)}</Chip>
             {orderState(o) === 'late' ? <span className="due late">{overdueBy}h overdue</span> : null}
-            <Btn variant="ghost" onClick={() => navigate({ to: '/commitment' })}>
+            <Btn variant="ghost" onClick={() => navigate({ to: '/commitment', search: { order: o.id } })}>
               Open report
             </Btn>
-            <Btn onClick={save}>Save</Btn>
+            <Btn variant={mayFinish ? 'ghost' : 'primary'} onClick={save}>
+              Save
+            </Btn>
+            {mayFinish ? (
+              <Btn onClick={finish}>{mine ? `Finish ${stageNow}` : `Mark ${stageNow} finished`}</Btn>
+            ) : null}
           </>
         }
       />
 
-      <Tabs tabs={[...TABS]} value={tab} onChange={setTab} />
+      <Tabs tabs={TABS.filter((t) => t !== 'Costs' || can('pricing'))} value={tab} onChange={setTab} />
 
       {tab === 'Details' ? (
         <>
@@ -396,7 +397,8 @@ export default function OrderDetail() {
                 <input
                   className="inp"
                   aria-label="Borrower"
-                  value={w.edits.bw ?? 'Sara Bahorik'}
+                  placeholder="not captured"
+                  value={parties.borrower}
                   onChange={(e) => field('bw', e.target.value)}
                 />
               </Field>
@@ -404,7 +406,8 @@ export default function OrderDetail() {
                 <input
                   className="inp mono"
                   aria-label="Effective date"
-                  value={w.edits.ef ?? fmtDate(hrs(-24 * 17))}
+                  placeholder="MM/DD/YYYY — not captured"
+                  value={parties.effective}
                   onChange={(e) => field('ef', e.target.value)}
                 />
               </Field>
@@ -412,7 +415,8 @@ export default function OrderDetail() {
                 <input
                   className="inp mono"
                   aria-label="Prior effective date"
-                  value={w.edits.oe ?? fmtDate(hrs(-24 * 380))}
+                  placeholder="MM/DD/YYYY — not captured"
+                  value={parties.priorEffective}
                   onChange={(e) => field('oe', e.target.value)}
                 />
               </Field>
@@ -421,7 +425,7 @@ export default function OrderDetail() {
                   className="inp mono"
                   aria-label="Parcel ID"
                   placeholder="not captured"
-                  value={w.edits.pi ?? ''}
+                  value={parties.parcel}
                   onChange={(e) => field('pi', e.target.value)}
                 />
               </Field>
@@ -430,7 +434,8 @@ export default function OrderDetail() {
                   <input
                     className="inp mono"
                     aria-label="Loan amount"
-                    value={w.edits.la ?? '64,804.00'}
+                    placeholder="not captured"
+                    value={parties.loanAmount}
                     onChange={(e) => field('la', e.target.value)}
                   />
                 </Field>
@@ -440,7 +445,7 @@ export default function OrderDetail() {
                 <input
                   className="inp"
                   id="o-ad"
-                  value={w.edits.ad ?? where}
+                  value={parties.address}
                   onChange={(e) => field('ad', e.target.value)}
                 />
               </div>
@@ -450,7 +455,7 @@ export default function OrderDetail() {
                   className="inp"
                   id="o-nr"
                   placeholder="each name indexed separately for judgment and lien"
-                  value={w.edits.nr ?? ''}
+                  value={parties.namesRun}
                   onChange={(e) => field('nr', e.target.value)}
                 />
               </div>
@@ -572,18 +577,22 @@ export default function OrderDetail() {
 
             <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 12 }}>
               Set under{' '}
-              <button
-                type="button"
-                className="lnk"
-                onClick={() =>
-                  navigate({
-                    to: '/company',
-                    search: { tab: 'Turnaround & SLA', sub: 'Stage budgets' },
-                  })
-                }
-              >
-                Turnaround &amp; SLA → Stage budgets
-              </button>
+              {mayOpenCompany ? (
+                <button
+                  type="button"
+                  className="lnk"
+                  onClick={() =>
+                    navigate({
+                      to: '/company',
+                      search: { tab: 'Turnaround & SLA', sub: 'Stage budgets' },
+                    })
+                  }
+                >
+                  Turnaround &amp; SLA → Stage budgets
+                </button>
+              ) : (
+                'Company → Turnaround & SLA → Stage budgets, by whoever runs the company'
+              )}
               .
             </p>
           </Card>
@@ -658,7 +667,7 @@ export default function OrderDetail() {
                             <option key={x.id} value={x.id}>
                               {x.n}
                               {x.avail !== 'ok' ? ` (${AVAIL[x.avail][0].toLowerCase()})` : ''}
-                              {PAIRS[s] && assign[PAIRS[s]] === x.id ? ` — did the ${PAIRS[s]}` : ''}
+                              {wouldSelfReview(assign, s, x.id) ? ` — did the ${PAIRS[s]}` : ''}
                             </option>
                           ),
                         )}
@@ -771,7 +780,7 @@ export default function OrderDetail() {
                   disabled={!can('qc')}
                   title={can('qc') ? undefined : 'Your account cannot enter ratings'}
                   onClick={() => {
-                    markRated(o.id)
+                    markRated(o.id, me.n)
                     toast(
                       ratingRequired
                         ? 'Ratings saved — the order can now be marked Sent'
@@ -926,7 +935,7 @@ export default function OrderDetail() {
         </>
       ) : null}
 
-      {tab === 'Costs' ? (
+      {tab === 'Costs' && can('pricing') ? (
         <Card>
           <CardHead
             title="Pass-through costs"
@@ -990,22 +999,15 @@ export default function OrderDetail() {
             <Rows bare>
               {(
                 [
-                  [fmtDT(o.recv), 'Order created from email', 'system', `${o.cl} · Search Order.pdf`],
+                  [o.recv, 'Order received', 'system', `${o.cl} · ${o.pr}`],
                   [
-                    fmtDT(hrs(-29)),
+                    o.recv,
                     'Due date set',
                     'system',
                     `SLA ${sla.cl} × ${sla.pr} = ${sla.h}h → ${fmtDT(o.due)} ${TZ}`,
                   ],
-                  [
-                    fmtDT(hrs(-28)),
-                    'Assigned · Search',
-                    'Harry Whitfield',
-                    assign.Search ? whoName(assign.Search) : '—',
-                  ],
-                  [fmtDT(hrs(-12)), 'Stage changed', 'Uma Sankar', `Search → ${st(o.stt)}`],
-                  [fmtDT(hrs(-6)), 'Field edited', 'Uma Sankar', 'Loan amount 64,084.00 → 64,804.00'],
-                ] as [string, string, string, string][]
+                  ...w.events.map((e) => [e.at, e.what, e.by || '—', e.detail]),
+                ] as [Date, string, string, string][]
               ).map(([at, what, by, detail], i) => (
                 <div className="rw" key={i}>
                   <span className="gr">·</span>
@@ -1015,7 +1017,7 @@ export default function OrderDetail() {
                   </span>
                   <span style={{ textAlign: 'right' }}>
                     <div className="mono gr" style={{ fontSize: 'var(--t-label)' }}>
-                      {at}
+                      {fmtDT(at)} {TZ}
                     </div>
                     <div className="sd">{by}</div>
                   </span>
@@ -1024,8 +1026,8 @@ export default function OrderDetail() {
             </Rows>
           </Card>
           <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 12 }}>
-            Every create, status change, assignment, field edit, QC rating and delivery is recorded
-            with who and when. This is the record that answers an insurer.
+            Every status change, assignment, field edit, cost, note and QC rating is recorded with
+            who and when. Until the server accepts writes, entries made here last for this session.
           </p>
         </>
       ) : null}
@@ -1049,6 +1051,12 @@ export default function OrderDetail() {
             </div>
           </div>
           <Rows bare>
+            {!w.notes.length ? (
+              <div className="rw">
+                <span className="gr">·</span>
+                <span className="gr">No notes on this order yet.</span>
+              </div>
+            ) : null}
             {w.notes.map((n) => (
               <div className="rw" key={n.id}>
                 <span>
@@ -1059,24 +1067,10 @@ export default function OrderDetail() {
                   <div className={`sd${n.defect ? ' bad' : ''}`}>{n.text}</div>
                 </span>
                 <span className="gr mono" style={{ fontSize: 'var(--t-label)' }}>
-                  {fmtDT(n.at)}
+                  {fmtDT(n.at)} {TZ}
                 </span>
               </div>
             ))}
-            <div className="rw">
-              <span>
-                <Avatar name="Vikki Sankar" />
-              </span>
-              <span>
-                <b>Vikki Sankar</b>
-                <div className="sd">
-                  Doc req raised — deed referenced in the mortgage isn’t imaged in the package.
-                </div>
-              </span>
-              <span className="gr mono" style={{ fontSize: 'var(--t-label)' }}>
-                {fmtDT(hrs(-11))}
-              </span>
-            </div>
           </Rows>
         </Card>
       ) : null}
@@ -1116,7 +1110,7 @@ export default function OrderDetail() {
                           className={`ro${BADSTATES.includes(status) ? ' warn' : ''}`}
                           style={{ fontSize: 'var(--t-label)', overflowWrap: 'anywhere' }}
                         >
-                          {l.u}
+                          <WebLink address={l.u} />
                         </div>
                       ) : (
                         <div className="ro warn">Not on file</div>

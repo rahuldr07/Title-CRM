@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { can, mayVisit, roleOf, visibleNav } from '@/lib/permissions'
+import { can, decidesOwn, mayVisit, roleName, roleOf, visibleNav } from '@/lib/permissions'
 import { NAVPERM, ROLELIST } from '@/data/org'
 import { STAFF } from '@/data/people'
 import { NAV } from '@/app/nav'
+import { saveRole } from '@/state/company'
 import type { Person } from '@/data/types'
 
 /**
@@ -141,5 +142,57 @@ describe('hiding a nav item and refusing the URL agree', () => {
     expect(mayVisit(undefined, 'orders')).toBe(true)
     expect(mayVisit(undefined, 'payroll')).toBe(false)
     expect(can(undefined, 'all')).toBe(false)
+  })
+})
+
+/*
+ * Nobody decides a request they are party to.
+ *
+ * A lead could approve their own overtime, their own attendance correction, a
+ * shift swap they were in, or their own leave — each of which reaches a payslip.
+ * It is the self-review principle, applied to pay and time.
+ */
+describe('deciding a request', () => {
+  it('is refused to the person who asked', () => {
+    expect(decidesOwn(['sk'], 'sk')).toBe(true)
+  })
+
+  it('is refused to either side of a swap', () => {
+    expect(decidesOwn(['us', 'ln'], 'ln')).toBe(true)
+    expect(decidesOwn(['us', 'ln'], 'us')).toBe(true)
+  })
+
+  it('is open to anyone else', () => {
+    expect(decidesOwn(['us', 'ln'], 'sk')).toBe(false)
+  })
+})
+
+/*
+ * A role edited on the permissions screen is the role that is enforced.
+ *
+ * The screen edited the company's copy of the roles while `can()` read the
+ * bundled list, so giving leads pricing changed the matrix on screen and changed
+ * nothing about what a lead could see.
+ */
+describe('an edited role', () => {
+  const lead = STAFF.find((s) => s.r === 'lead')!
+
+  it('grants what was added', () => {
+    expect(can(lead, 'pricing')).toBe(false)
+    const role = ROLELIST.find((r) => r.id === 'lead')!
+    saveRole({ ...role, p: [...role.p, 'pricing'] }, 'lead')
+    expect(can(lead, 'pricing')).toBe(true)
+  })
+
+  it('withdraws what was removed', () => {
+    const role = ROLELIST.find((r) => r.id === 'lead')!
+    saveRole({ ...role, p: role.p.filter((k) => k !== 'assign') }, 'lead')
+    expect(can(lead, 'assign')).toBe(false)
+  })
+
+  it('names the role as edited', () => {
+    const role = ROLELIST.find((r) => r.id === 'lead')!
+    saveRole({ ...role, n: 'Team lead' }, 'lead')
+    expect(roleName('lead')).toBe('Team lead')
   })
 })

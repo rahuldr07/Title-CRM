@@ -7,7 +7,8 @@ import { LEAVE, LEAVEPOLICY, LEAVETYPES, LVSTATUS } from '@/data/hrms'
 import { STAFF } from '@/data/people'
 import { leaveBalance } from '@/lib/payroll'
 import { CLASHRULES, approvesFor, leaveCheck, managerOf } from '@/lib/leave'
-import { whoName } from '@/lib/permissions'
+import { OWN_REQUEST, decidesOwn, whoName } from '@/lib/permissions'
+import { resetBoard } from '@/lib/engine'
 import { fmtDate, r2 } from '@/lib/format'
 import { now } from '@/lib/clock'
 import { ApplyLeave } from './leave/ApplyLeave'
@@ -41,9 +42,12 @@ function LeaveScreen() {
   const decide = (id: string, st: 'approved' | 'rejected') => {
     const l = LEAVE.find((x) => x.id === id)
     if (!l) return
+    if (decidesOwn([l.who], me.id)) return toast(OWN_REQUEST)
     l.st = st
     l.by = me.n
     l.at = now()
+    /* Approved leave takes someone off the run's roster for those days. */
+    resetBoard()
     changed()
     toast(`${whoName(l.who)} — ${st === 'approved' ? 'approved' : 'declined'}`)
   }
@@ -342,7 +346,7 @@ function LeaveScreen() {
                         </div>
                         <div className="cell">
                           {l.st === 'pending' ? (
-                            can('assign') ? (
+                            can('assign') && !decidesOwn([l.who], me.id) ? (
                               <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                                 {approver?.id === me.id ? null : (
                                   <span className="gr" style={{ fontSize: 'var(--t-label)' }}>

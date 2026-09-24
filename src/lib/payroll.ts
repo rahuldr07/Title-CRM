@@ -4,7 +4,6 @@ import {
   CLAIMS,
   OLDSLABS,
   OLDSTD,
-  OT,
   PAYMONTHS,
   STDDED,
   TAXSLABS,
@@ -12,23 +11,31 @@ import {
   LEAVE,
   LEAVETYPES,
 } from '@/data/hrms'
-import { STAFF } from '@/data/people'
 import { LOANPAYMENTS, LOANS } from '@/data/loans'
 import { loanDeductionsFor, openLoansFor, outstanding, type LoanDeduction } from '@/lib/loans'
-import { currentPayCfg } from '@/state/company'
-import { pad } from './format'
+import { currentPayCfg, currentStaff } from '@/state/company'
+import { runOf } from '@/state/payruns'
+import { currentOvertime } from '@/state/overtime'
+import { pad, signed } from './format'
 import { now } from '@/lib/clock'
-import type { Person, RunState } from '@/data/types'
+import type { PayConfig, Person, RunState } from '@/data/types'
+import type { Overtime } from '@/data/hrms'
+
+/* The employer's ESI rate, set by statute alongside the employee's 0.75%. */
+const ESI_EMPLOYER_PCT = 3.25
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-export const inr = (n: number) => currentPayCfg().sym + Math.round(n).toLocaleString('en-IN')
+export const inr = (n: number) => signed(n, currentPayCfg().sym, Math.abs(Math.round(n)).toLocaleString('en-IN'))
 export const inr2 = (n: number) =>
-  currentPayCfg().sym +
-  (Math.round(n * 100) / 100).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
+  signed(
+    n,
+    currentPayCfg().sym,
+    Math.abs(Math.round(n * 100) / 100).toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }),
+  )
 
 export interface Structure {
   ctc: number
@@ -42,14 +49,14 @@ export interface Structure {
   pfWage: number
 }
 
-export function structureOf(p: Pick<Person, 'ctc'>): Structure {
+export function structureOf(p: Pick<Person, 'ctc'>, cfg: PayConfig = currentPayCfg()): Structure {
   const ctc = p.ctc ?? 0
   const m = ctc / 12
-  const basic = Math.round((m * currentPayCfg().basicPct) / 100)
-  const hra = Math.round((basic * currentPayCfg().hraPctOfBasic) / 100)
-  const pfWage = currentPayCfg().pfOnFullBasic ? basic : Math.min(basic, currentPayCfg().pfWageCeiling)
-  const epfEr = Math.round((pfWage * currentPayCfg().pfPct) / 100)
-  const grat = Math.round((basic * currentPayCfg().gratuityPct) / 100)
+  const basic = Math.round((m * cfg.basicPct) / 100)
+  const hra = Math.round((basic * cfg.hraPctOfBasic) / 100)
+  const pfWage = cfg.pfOnFullBasic ? basic : Math.min(basic, cfg.pfWageCeiling)
+  const epfEr = Math.round((pfWage * cfg.pfPct) / 100)
+  const grat = Math.round((basic * cfg.gratuityPct) / 100)
   const special = Math.max(0, Math.round(m - epfEr - grat - basic - hra))
   return { ctc, monthly: Math.round(m), basic, hra, special, gross: basic + hra + special, epfEr, grat, pfWage }
 }
@@ -78,13 +85,18 @@ export const monthOf = (mmddyyyy: string) => {
   return `${mon} ${y}`
 }
 
-export const otMinsFor = (id: string, mn: string) =>
-  OT.filter((o) => o.who === id && o.st === 'approved' && monthOf(o.d) === mn).reduce((a, o) => a + o.mins, 0)
+export const otMinsFor = (id: string, mn: string, list: Overtime[] = currentOvertime()) =>
+  list.filter((o) => o.who === id && o.st === 'approved' && monthOf(o.d) === mn).reduce((a, o) => a + o.mins, 0)
 
-export function otPay(p: Person, mn: string): number {
-  const mins = otMinsFor(p.id, mn)
+export function otPay(
+  p: Person,
+  mn: string,
+  cfg: PayConfig = currentPayCfg(),
+  list: Overtime[] = currentOvertime(),
+): number {
+  const mins = otMinsFor(p.id, mn, list)
   if (!mins) return 0
-  const s = structureOf(p)
+  const s = structureOf(p, cfg)
   const a = ATT[mn]?.[p.id]
   const perHour = s.gross / Math.max(1, a?.working ?? 26) / 8
   return Math.round(perHour * (mins / 60) * TIMECFG.otRate)
@@ -134,6 +146,7 @@ export interface Payslip {
   gross: number
   epf: number
   esi: number
+  esiEr: number
   pt: number
   tds: number
   totalDed: number
@@ -141,8 +154,14 @@ export interface Payslip {
   net: number
 }
 
-export function payslipOf(p: Person, mn: string): Payslip {
-  const st = structureOf(p)
+/* A closed run answers from what it kept at approval — its settings and its
+   roster — so a later change to either cannot rewrite a month already paid. */
+export function payslipOf(person: Person, mn: string): Payslip {
+  const kept = runOf(mn)?.kept
+  const cfg = kept?.cfg ?? currentPayCfg()
+  const p = kept?.staff.find((s) => s.id === person.id) ?? person
+  const overtime = kept?.ot ?? currentOvertime()
+  const st = structureOf(p, cfg)
   const a = ATT[mn]?.[p.id] ?? {
     days: 30,
     working: 26,
@@ -163,11 +182,12 @@ export function payslipOf(p: Person, mn: string): Payslip {
   const special = Math.round(st.special * f)
   const gross = basic + hra + special
 
-  const pfWage = currentPayCfg().pfOnFullBasic ? basic : Math.min(basic, currentPayCfg().pfWageCeiling)
-  const epf = Math.round((pfWage * currentPayCfg().pfPct) / 100)
-  const esi = gross <= currentPayCfg().esiGrossLimit ? Math.round((gross * currentPayCfg().esiPct) / 100) : 0
-  const pt = gross > 0 ? currentPayCfg().ptAmount : 0
-  const tds = Math.round(taxUnder(currentPayCfg().regime, st.gross * 12) / 12)
+  const pfWage = cfg.pfOnFullBasic ? basic : Math.min(basic, cfg.pfWageCeiling)
+  const epf = Math.round((pfWage * cfg.pfPct) / 100)
+  const esi = gross <= cfg.esiGrossLimit ? Math.round((gross * cfg.esiPct) / 100) : 0
+  const esiEr = esi ? Math.round((gross * ESI_EMPLOYER_PCT) / 100) : 0
+  const pt = gross > 0 ? cfg.ptAmount : 0
+  const tds = Math.round(taxUnder(cfg.regime, st.gross * 12) / 12)
 
   const arrRows = arrearsFor(p.id, mn)
   const arr = arrRows.reduce((acc, x) => acc + x.amt, 0)
@@ -176,8 +196,8 @@ export function payslipOf(p: Person, mn: string): Payslip {
   const loanTotal = loanDeds.reduce((a, d) => a + d.amount, 0)
   const ded = epf + esi + pt + tds + loanTotal
 
-  const ot = otPay(p, mn)
-  const otm = otMinsFor(p.id, mn)
+  const ot = otPay(p, mn, cfg, overtime)
+  const otm = otMinsFor(p.id, mn, overtime)
 
   const earn: [string, number][] = [
     ['Basic', basic],
@@ -190,7 +210,7 @@ export function payslipOf(p: Person, mn: string): Payslip {
 
   const dedRows: [string, number][] = [
     ['Provident fund (employee)', epf],
-    [`Professional tax — ${currentPayCfg().ptState}`, pt],
+    [`Professional tax — ${cfg.ptState}`, pt],
   ]
   if (esi) dedRows.push(['ESI (employee)', esi])
   dedRows.push(['Income tax (TDS)', tds])
@@ -213,11 +233,13 @@ export function payslipOf(p: Person, mn: string): Payslip {
     reimb: claimsFor(p.id, mn).map((c) => [c.what, c.amt] as [string, number]),
     employer: [
       ['Provident fund (employer)', st.epfEr],
+      ...(esiEr ? [['ESI (employer)', esiEr] as [string, number]] : []),
       ['Gratuity provision', st.grat],
     ],
     gross: grossPay,
     epf,
     esi,
+    esiEr,
     pt,
     tds,
     totalDed: ded,
@@ -226,8 +248,25 @@ export function payslipOf(p: Person, mn: string): Payslip {
   }
 }
 
+/* The Indian financial year runs April to March; a payslip's year to date and
+   Form 16 are counted against it, not the calendar year. */
+const fyStart = (monthIndex: number, year: number) => (monthIndex >= 3 ? year : year - 1)
+
+const fyLabel = (y: number) => `FY ${y}-${String((y + 1) % 100).padStart(2, '0')}`
+
+export const fyOf = (d: Date): string => fyLabel(fyStart(d.getMonth(), d.getFullYear()))
+
+const fyOfMonth = (mn: string): number => {
+  const [mon, yr] = mn.split(' ')
+  return fyStart(MON.indexOf(mon ?? ''), Number(yr))
+}
+
+/** The financial year a pay month ("May 2026") falls in, as "FY 2026-27". */
+export const fyOfPayMonth = (mn: string): string => fyLabel(fyOfMonth(mn))
+
 export function ytd(p: Person, mn: string) {
-  const upto = PAYMONTHS.slice(0, PAYMONTHS.indexOf(mn) + 1)
+  const fy = fyOfMonth(mn)
+  const upto = PAYMONTHS.slice(0, PAYMONTHS.indexOf(mn) + 1).filter((m) => fyOfMonth(m) === fy)
   return upto.reduce(
     (acc, m) => {
       const s = payslipOf(p, m)
@@ -235,13 +274,17 @@ export function ytd(p: Person, mn: string) {
       acc.ded += s.totalDed
       acc.net += s.net
       acc.tds += s.tds
+      acc.months += 1
       return acc
     },
-    { gross: 0, ded: 0, net: 0, tds: 0 },
+    { gross: 0, ded: 0, net: 0, tds: 0, months: 0 },
   )
 }
 
-export const paidStaff = () => STAFF.filter((x) => x.active !== false && x.ctc)
+/* Today's roster from the company store, so a CTC edited on the staff form is the
+   one payroll pays; a closed run's roster is the one it kept. */
+export const paidStaff = (mn?: string): Person[] =>
+  ((mn ? runOf(mn)?.kept?.staff : undefined) ?? currentStaff()).filter((x) => x.active !== false && x.ctc)
 
 export interface Balance {
   earned: number
@@ -318,15 +361,17 @@ export interface PayTotals {
   pf: number
   erpf: number
   esi: number
+  esiEr: number
   pt: number
   tds: number
   grat: number
   loans: number
+  claims: number
   lop: Payslip[]
 }
 
 export function payTotals(mn: string): PayTotals {
-  const list = paidStaff().map((p) => payslipOf(p, mn))
+  const list = paidStaff(mn).map((p) => payslipOf(p, mn))
   const sum = (f: (x: Payslip) => number) => list.reduce((a, x) => a + f(x), 0)
   return {
     list,
@@ -336,13 +381,31 @@ export function payTotals(mn: string): PayTotals {
     pf: sum((x) => x.epf),
     erpf: sum((x) => x.st.epfEr),
     esi: sum((x) => x.esi),
+    esiEr: sum((x) => x.esiEr),
     pt: sum((x) => x.pt),
     tds: sum((x) => x.tds),
     grat: sum((x) => x.st.grat),
     loans: sum((x) => x.loanDeds.reduce((a, d) => a + d.amount, 0)),
+    claims: sum((x) => x.claims),
     lop: list.filter((x) => x.unpaid > 0),
   }
 }
+
+/* Every deduction the total carries, so a tile that lists them adds up to its own figure. */
+export function deductionParts(t: PayTotals): [string, number][] {
+  return (
+    [
+      ['PF', t.pf],
+      ['ESI', t.esi],
+      ['PT', t.pt],
+      ['TDS', t.tds],
+      ['Loans', t.loans],
+    ] as [string, number][]
+  ).filter(([, v]) => v)
+}
+
+/** What the month costs the company: gross plus the employer's PF, ESI and gratuity. */
+export const companyCost = (t: PayTotals): number => t.gross + t.erpf + t.esiEr + t.grat
 
 export const stepIndex = (state: string): number =>
   ({ draft: 0, locked: 2, approved: 4, paid: 5 })[state] ?? 0

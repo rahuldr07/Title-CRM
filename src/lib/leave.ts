@@ -5,6 +5,20 @@ import { now } from './clock'
 import type { Leave, Person } from '@/data/types'
 import { fmtDate, midnight, r2 } from '@/lib/format'
 
+/** Whether someone is on approved leave on a day. Attendance and the assignment engine both ask this. */
+export function onLeaveOn(id: string, d: Date): boolean {
+  /* Leave is stored as whole days at midnight, so the day is compared, not the
+     hour: at noon a one-day leave ending "3 Aug" is still running. */
+  const day = midnight(d).getTime()
+  return LEAVE.some(
+    (l) => l.who === id && l.st === 'approved' && midnight(l.from).getTime() <= day && midnight(l.to).getTime() >= day,
+  )
+}
+
+/** Someone's availability on a day: on leave while approved leave covers it, otherwise their standing flag. */
+export const availOn = (p: Pick<Person, 'id' | 'avail'>, d: Date): Person['avail'] =>
+  onLeaveOn(p.id, d) ? 'leave' : p.avail
+
 export const CLASHRULES: Record<string, [label: string, detail: string]> = {
   warn: ['Warn only', 'Tell them, let them send it anyway. The approver decides.'],
   reason: [

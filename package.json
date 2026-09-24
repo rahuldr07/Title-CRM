@@ -21,6 +21,7 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "smoke": "node scripts/smoke.mjs",
+    "check:pricing": "node scripts/pricing.mjs",
     "profile": "node scripts/profile.mjs",
     "check": "node scripts/interactions.mjs",
     "shots": "node scripts/shots.mjs"

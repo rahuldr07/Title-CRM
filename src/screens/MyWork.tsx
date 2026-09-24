@@ -43,7 +43,7 @@ import { hhmm, hm, restCheck, shiftOf, worked } from '@/lib/workingDay'
 import { whoName } from '@/lib/permissions'
 import { scoreBand } from '@/lib/quality'
 import { celebrationsWithin } from '@/lib/celebrations'
-import { fmtDT, fmtDate, parseUsDate } from '@/lib/format'
+import { TZ, fmtDT, fmtDate, parseUsDate } from '@/lib/format'
 import { now } from '@/lib/clock'
 import type { Update } from '@/data/types'
 
@@ -339,485 +339,491 @@ export default function MyWork() {
         }
       />
 
-      <YourWish celebrations={yours} firstName={me.n.split(' ')[0]} />
+      {/* On a phone the queue goes first; see `.mw` in index.css. */}
+      <div className="mw">
+        <YourWish celebrations={yours} firstName={me.n.split(' ')[0]} />
 
-      <Card padded style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: 220 }}>
-            <Label>Today — {fmtDate(now())}</Label>
-            <div style={{ fontSize: 'var(--t-body)', marginTop: 6 }}>
-              <Chip kind={shift.c}>{shift.n}</Chip>{' '}
-              <span className="gr">
-                {shift.from} to {shift.to}
-              </span>
-            </div>
-            {mark ? (
-              <>
-                <div className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 7 }}>
-                  In at <b className="mono">{mark.in}</b>
-                  {mark.out ? (
-                    <>
-                      {' · out at '}
-                      <b className="mono">{mark.out}</b> · <b>{hm(worked(mark))}</b>
-                    </>
-                  ) : (
-                    ' · still working'
-                  )}
-                  {mark.late ? <span className="warn"> · {mark.late} minutes late</span> : null}
-                </div>
-                <div className="gr" style={{ fontSize: 'var(--t-label)', marginTop: 3 }}>
-                  {mark.inside ? <span className="ok">✓</span> : <span className="warn">◷</span>}{' '}
-                  {mark.where}
-                  {mark.acc ? ` · accurate to ${mark.acc} m` : ''}
-                </div>
-              </>
-            ) : (
-              <div className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 7 }}>
-                Not marked yet. Checking in asks the browser where you are.
+        <Card padded style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <Label>Today — {fmtDate(now())}</Label>
+              <div style={{ fontSize: 'var(--t-body)', marginTop: 6 }}>
+                <Chip kind={shift.c}>{shift.n}</Chip>{' '}
+                <span className="gr">
+                  {shift.from} to {shift.to} {TZ}
+                </span>
               </div>
-            )}
+              {mark ? (
+                <>
+                  <div className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 7 }}>
+                    In at <b className="mono">{mark.in}</b>
+                    {mark.out ? (
+                      <>
+                        {' · out at '}
+                        <b className="mono">{mark.out}</b> · <b>{hm(worked(mark))}</b>
+                      </>
+                    ) : (
+                      ' · still working'
+                    )}
+                    {mark.late ? <span className="warn"> · {mark.late} minutes late</span> : null}
+                  </div>
+                  <div className="gr" style={{ fontSize: 'var(--t-label)', marginTop: 3 }}>
+                    {mark.inside ? <span className="ok">✓</span> : <span className="warn">◷</span>}{' '}
+                    {mark.where}
+                    {mark.acc ? ` · accurate to ${mark.acc} m` : ''}
+                  </div>
+                </>
+              ) : (
+                <div className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 7 }}>
+                  Not marked yet. Checking in asks the browser where you are.
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap', alignItems: 'center' }}>
+              {clockActions}
+              <Btn variant="ghost" onClick={askSwap}>
+                Swap a shift
+              </Btn>
+              <Btn variant="ghost" onClick={() => navigate({ to: '/leave' })}>
+                Leave
+              </Btn>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap', alignItems: 'center' }}>
-            {clockActions}
-            <Btn variant="ghost" onClick={askSwap}>
-              Swap a shift
-            </Btn>
-            <Btn variant="ghost" onClick={() => navigate({ to: '/leave' })}>
-              Leave
-            </Btn>
-          </div>
-        </div>
 
-        {rest ? (
-          <div
-            className="rw"
-            style={{
-              background: rest.ok ? 'var(--oktint)' : 'var(--warntint)',
-              borderRadius: 9,
-              padding: '11px 13px',
-              marginTop: 12,
-            }}
-          >
-            <span className={rest.ok ? 'ok' : 'warn'} style={{ fontSize: 'var(--t-lead)' }}>
-              {rest.ok ? '✓' : '◷'}
-            </span>
-            <span>
-              <b>{rest.ok ? 'Rest break taken' : 'No rest break yet'}</b>
-              <div className="sd">{rest.msg}</div>
-            </span>
-            <span />
-          </div>
-        ) : null}
+          {rest ? (
+            <div
+              className="rw"
+              style={{
+                background: rest.ok ? 'var(--oktint)' : 'var(--warntint)',
+                borderRadius: 9,
+                padding: '11px 13px',
+                marginTop: 12,
+              }}
+            >
+              <span className={rest.ok ? 'ok' : 'warn'} style={{ fontSize: 'var(--t-lead)' }}>
+                {rest.ok ? '✓' : '◷'}
+              </span>
+              <span>
+                <b>{rest.ok ? 'Rest break taken' : 'No rest break yet'}</b>
+                <div className="sd">{rest.msg}</div>
+              </span>
+              <span />
+            </div>
+          ) : null}
 
-        {mark?.breakMins ? (
-          <div className="gr" style={{ fontSize: 'var(--t-label)', marginTop: 8 }}>
-            Break: {mark.breakMins} minutes
-            {mark.breakIn && !mark.breakOut ? ' — on a break now' : ''}
-          </div>
-        ) : null}
-      </Card>
-
-      <Kpis>
-        <Kpi
-          title="On your desk"
-          value={<span className={open.length ? 'warn' : 'ok'}>{open.length}</span>}
-          tone={open.length ? 'warn' : undefined}
-          detail={open.length ? 'still to finish' : 'nothing outstanding'}
-          chevron
-          hint="Your queue"
-          onClick={() => focusSection('mwQueue')}
-        />
-        <Kpi
-          title="Finished today"
-          value={<span className="ok">{wk.done}</span>}
-          detail={`${wk.pct}% of what you were given`}
-          chevron
-          hint="What you finished"
-          onClick={myDone}
-        />
-        <Kpi
-          title="Running late"
-          value={<span className={risky.length ? 'bad' : 'ok'}>{risky.length}</span>}
-          tone={risky.length ? 'alert' : undefined}
-          detail="past an internal checkpoint"
-          chevron
-          hint="Which ones, and by how much"
-          onClick={myLate}
-        />
-        <Kpi
-          title="Room left today"
-          value={roomLeft}
-          detail={`of a ${me.cap} target`}
-          chevron
-          hint="How the target is set"
-          onClick={myCapacity}
-        />
-      </Kpis>
-
-      {/* The ring shares a row with "Around the team" so the two cards stretch to
-          one height. `-2 / -1` is the last column at any width — the second on a
-          desktop, the only one once `.two` collapses — and dense packing lets
-          "Around the team" take the free cell beside it although it comes later,
-          which keeps the ring directly under the leave card on a phone. */}
-      <div className="two" style={{ marginTop: 16, gridAutoFlow: 'row dense' }}>
-        <Card padded>
-          <Label>Your {month}</Label>
-          {(
-            [
-              ['Days present', `${att.present} of ${att.working}`],
-              ['Paid leave taken', att.paidLeave],
-              ['Unpaid days', att.lop],
-              ['Holidays in the month', att.hol],
-            ] as [string, string | number][]
-          ).map((r) => (
-            <DetailRow key={r[0]} label={r[0]} value={<b className="mono">{r[1]}</b>} />
-          ))}
-          {nextHoliday ? (
-            <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 12 }}>
-              Next holiday: <b>{nextHoliday.h.n}</b> on {nextHoliday.h.d}
-              {nextHoliday.h.opt ? ' — optional' : ''}.
-            </p>
+          {mark?.breakMins ? (
+            <div className="gr" style={{ fontSize: 'var(--t-label)', marginTop: 8 }}>
+              Break: {mark.breakMins} minutes
+              {mark.breakIn && !mark.breakOut ? ' — on a break now' : ''}
+            </div>
           ) : null}
         </Card>
 
-        <Card padded>
-          <Label>Leave you have left</Label>
-          {LEAVETYPES.filter((t) => t.annual > 0).map((t) => {
-            const b = balances[t.k]
-            return (
-              <div
-                key={t.k}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '130px 1fr 78px',
-                  gap: 11,
-                  alignItems: 'center',
-                  padding: '6px 0',
-                  fontSize: 'var(--t-body)',
-                }}
-              >
-                <span>
-                  <Chip kind={t.c}>{t.n}</Chip>
-                </span>
-                <Bar value={b.left} max={Math.max(1, b.earned)} color="var(--brand2)" />
-                <span className="mono" style={{ textAlign: 'right' }}>
-                  {b.left} of {b.earned}
-                </span>
-              </div>
-            )
-          })}
-          <div style={{ marginTop: 12 }}>
-            <Btn variant="ghost" small onClick={() => navigate({ to: '/leave' })}>
-              Apply for leave
-            </Btn>
-          </div>
-        </Card>
-
-        <Card
-          padded
-          style={{
-            gridColumn: '-2 / -1',
-            alignSelf: 'stretch',
-            display: 'grid',
-            placeItems: 'center',
-          }}
-        >
-          <ScoreRing
-            band={band}
-            label={band ? `Quality score ${band.pct}%, ${band.label}` : 'No quality score to show'}
+        <Kpis>
+          <Kpi
+            title="On your desk"
+            value={<span className={open.length ? 'warn' : 'ok'}>{open.length}</span>}
+            tone={open.length ? 'warn' : undefined}
+            detail={open.length ? 'still to finish' : 'nothing outstanding'}
+            chevron
+            hint="Your queue"
+            onClick={() => focusSection('mwQueue')}
           />
-        </Card>
+          <Kpi
+            title="Finished today"
+            value={<span className="ok">{wk.done}</span>}
+            detail={`${wk.pct}% of what you were given`}
+            chevron
+            hint="What you finished"
+            onClick={myDone}
+          />
+          <Kpi
+            title="Running late"
+            value={<span className={risky.length ? 'bad' : 'ok'}>{risky.length}</span>}
+            tone={risky.length ? 'alert' : undefined}
+            detail="past an internal checkpoint"
+            chevron
+            hint="Which ones, and by how much"
+            onClick={myLate}
+          />
+          <Kpi
+            title="Room left today"
+            value={roomLeft}
+            detail={`of a ${me.cap} target`}
+            chevron
+            hint="How the target is set"
+            onClick={myCapacity}
+          />
+        </Kpis>
 
-        {theirs.length ? (
-          <TeamWishes celebrations={theirs} title="Around the team" style={{ alignSelf: 'stretch' }} />
-        ) : null}
-      </div>
-
-      {risky.length ? (
-        <Banner
-          kind="d"
-          icon="⚑"
-          style={{ marginTop: 16 }}
-          title={`${risky.length} of yours ${risky.length === 1 ? 'is' : 'are'} behind where they should be`}
-        >
-          These are at the top of the list.{' '}
-          {risky.some((x) => x.p.doomed)
-            ? 'One or more cannot be finished in time — tell whoever runs your department now, not at five o’clock.'
-            : 'Still recoverable, but the slack is going.'}
-        </Banner>
-      ) : null}
-
-      <Card padded style={{ marginTop: 18 }}>
-        <div className="ch" style={{ border: 'none', padding: '0 0 10px' }}>
-          <Label>What you wrote</Label>
-          <div className="r">
-            <Btn small onClick={addUpdate}>
-              ＋ Add an update
-            </Btn>
-          </div>
-        </div>
-        {myUpdates.length ? (
-          <Rows bare>
-            {myUpdates.map((u) => updateRow(u, false))}
-          </Rows>
-        ) : (
-          <p className="gr" style={{ fontSize: 'var(--t-body)', margin: 0 }}>
-            Nothing yet. A handover note written today is the thing that saves someone an hour
-            tomorrow.
-          </p>
-        )}
-        <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 12 }}>
-          Updates cannot be edited once posted. That is what makes them worth reading back.
-        </p>
-      </Card>
-
-      <SectionHead id="mwQueue">
-        {open.length ? `Your queue — ${open.length} to do` : 'Your queue is clear'}
-      </SectionHead>
-
-      {open.length ? (
-        <>
-          <Card>
-            <div className="tsc">
-              <div style={{ minWidth: QMIN }}>
-                <div className="trow h" style={{ gridTemplateColumns: QCOLS }}>
-                  <span>#</span>
-                  <span>Order</span>
-                  <span>Client</span>
-                  <span>Your stage</span>
-                  <span>Property</span>
-                  <span>Due</span>
-                  <span />
-                </div>
-                <div className="tb">
-                  {open.map(({ o, stage, hr }, i) => {
-                    const plan = orderPlan(o)
-                    const cp = plan.rows.find((r) => r.stage === stage)
-                    const openOrder = () =>
-                      navigate({ to: '/orders/$orderId', params: { orderId: o.id } })
-                    return (
-                      <div
-                        key={`${o.id}-${stage}-${i}`}
-                        className="trow"
-                        role="button"
-                        tabIndex={0}
-                        style={{ gridTemplateColumns: QCOLS, cursor: 'pointer' }}
-                        onClick={openOrder}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            openOrder()
-                          }
-                        }}
-                      >
-                        <div className="cell">
-                          <div className="gr mono" style={{ fontSize: 'var(--t-label)' }}>
-                            {i + 1}
-                          </div>
-                        </div>
-                        <div className="cell">
-                          <div className="v mono">{o.id}</div>
-                          <div className="s">arrived {hr}:00</div>
-                        </div>
-                        <div className="cell">
-                          <div className="v">{o.cl}</div>
-                          <div className="s">{o.pr}</div>
-                        </div>
-                        <div className="cell">
-                          <div className="v">{stage}</div>
-                          {cp?.behind ? (
-                            <div className="s bad">past your checkpoint</div>
-                          ) : cp ? (
-                            <div className="s gr">by {fmtDT(cp.at)}</div>
-                          ) : null}
-                        </div>
-                        <div className="cell">
-                          <div className="v" style={{ fontSize: 'var(--t-small)' }}>
-                            {o.co ? `${o.co}, ${o.st}` : '—'}
-                          </div>
-                        </div>
-                        <div className="cell">
-                          <Due at={dueOf(o)} />
-                        </div>
-                        <div className="cell">
-                          <Btn
-                            variant="ghost"
-                            small
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              openOrder()
-                            }}
-                          >
-                            Open
-                          </Btn>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-          </Card>
-          <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 10 }}>
-            Ordered by when it arrived. Your checkpoint is your department’s slice of the client’s
-            promise — not the client deadline itself, which is later.
-          </p>
-        </>
-      ) : (
-        <Card padded>
-          <p className="gr" style={{ fontSize: 'var(--t-small)', margin: 0 }}>
-            Everything assigned to you today is done. {wk.done} stage{wk.done === 1 ? '' : 's'}{' '}
-            finished.
-          </p>
-        </Card>
-      )}
-
-      {wk.done ? (
-        <>
-          <SectionHead id="mwDone">Finished today — {wk.done}</SectionHead>
-          <Card>
-            <Rows bare>
-              {(showAllDone ? finished : finished.slice(0, 8)).map((i, idx) => (
-                <div className="rw" key={`${i.o.id}-${i.stage}-${idx}`}>
-                  <span className="ok">✓</span>
-                  <span>
-                    <b className="mono" style={{ fontSize: 'var(--t-small)' }}>
-                      {i.o.id}
-                    </b>{' '}
-                    <span className="gr">{i.stage}</span>
-                    <div className="sd gr">
-                      {i.o.cl} · {i.o.pr}
-                    </div>
-                  </span>
-                  <span className="gr mono" style={{ fontSize: 'var(--t-label)' }}>
-                    {i.hr}:00
-                  </span>
-                </div>
-              ))}
-              {finished.length > 8 && !showAllDone ? (
-                <div className="rw">
-                  <span className="gr">·</span>
-                  <span className="gr" style={{ fontSize: 'var(--t-small)' }}>
-                    and {finished.length - 8} more
-                  </span>
-                  <span>
-                    <Btn variant="ghost" small onClick={() => setShowAllDone(true)}>
-                      Show all
-                    </Btn>
-                  </span>
-                </div>
-              ) : null}
-            </Rows>
-          </Card>
-        </>
-      ) : null}
-
-      <div className="two" style={{ marginTop: 18 }}>
-        <Card padded>
-          <Label>Your quality</Label>
-          {!showScores ? (
-            <>
-              <p className="gr" style={{ fontSize: 'var(--t-small)', margin: 0 }}>
-                Scores are not shown to the person rated on this account.
+        {/* The ring shares a row with "Around the team" so the two cards stretch to
+            one height. `-2 / -1` is the last column at any width — the second on a
+            desktop, the only one once `.two` collapses — and dense packing lets
+            "Around the team" take the free cell beside it although it comes later,
+            which keeps the ring directly under the leave card on a phone. */}
+        <div className="two" style={{ marginTop: 16, gridAutoFlow: 'row dense' }}>
+          <Card padded>
+            <Label>Your {month}</Label>
+            {(
+              [
+                ['Days present', `${att.present} of ${att.working}`],
+                ['Paid leave taken', att.paidLeave],
+                ['Unpaid days', att.lop],
+                ['Holidays in the month', att.hol],
+              ] as [string, string | number][]
+            ).map((r) => (
+              <DetailRow key={r[0]} label={r[0]} value={<b className="mono">{r[1]}</b>} />
+            ))}
+            {nextHoliday ? (
+              <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 12 }}>
+                Next holiday: <b>{nextHoliday.h.n}</b> on {nextHoliday.h.d}
+                {nextHoliday.h.opt ? ' — optional' : ''}.
               </p>
-              <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 10 }}>
-                That is a company setting — <b>Quality → How scoring works → “Scores are visible to
-                the person rated”</b>. It is off by default, on the view that ratings used for filing
-                should not be read as a report card.
-              </p>
-            </>
-          ) : qcLog.isPending ? (
-            <SkeletonRows rows={3} cols={2} />
-          ) : rated.length && qavg !== null ? (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '8px 0 10px' }}>
-                <ScoreGauge value={qavg} />
-                <span className="gr">
-                  from {rated.length} checks · {range.label}
-                </span>
-              </div>
-              {rated.filter((x) => x.note).length ? (
-                <Rows bare>
-                  {rated
-                    .filter((x) => x.note)
-                    .slice(0, 4)
-                    .map((x, i) => (
-                      <div className="rw" key={`${x.order}-${i}`}>
-                        <span className="warn" style={{ fontSize: 'var(--t-lead)' }}>
-                          ⚑
-                        </span>
-                        <span>
-                          <b style={{ fontSize: 'var(--t-small)' }}>{x.note}</b>
-                          <div className="sd gr">
-                            {x.crit} · {x.order} · {x.dk}
-                          </div>
-                        </span>
-                        <span />
-                      </div>
-                    ))}
-                </Rows>
-              ) : (
-                <p className="gr" style={{ fontSize: 'var(--t-small)', margin: 0 }}>
-                  Nothing has been raised against your work in this range.
-                </p>
-              )}
-              <Btn
-                variant="ghost"
-                small
-                className="mwAll"
-                onClick={() => navigate({ to: '/staff/$personId', params: { personId: me.id } })}
-              >
-                All of it
-              </Btn>
-            </>
-          ) : (
-            <p className="gr" style={{ fontSize: 'var(--t-small)', margin: 0 }}>
-              Nothing of yours has been checked in this range.
-            </p>
-          )}
-        </Card>
+            ) : null}
+          </Card>
 
-        <Card padded>
-          <Label>Where you fit</Label>
-          {me.dep.length ? (
-            me.dep.map((d) => {
-              const dept = dwork[d] ?? { tot: 0 }
-              const st = wk.stages[d] ?? { done: 0, pend: 0 }
+          <Card padded>
+            <Label>Leave you have left</Label>
+            {LEAVETYPES.filter((t) => t.annual > 0).map((t) => {
+              const b = balances[t.k]
               return (
                 <div
-                  key={d}
+                  key={t.k}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '130px 1fr 110px',
-                    gap: 12,
+                    gridTemplateColumns: '130px 1fr 78px',
+                    gap: 11,
                     alignItems: 'center',
-                    padding: '7px 0',
-                    fontSize: 'var(--t-small)',
+                    padding: '6px 0',
+                    fontSize: 'var(--t-body)',
                   }}
                 >
                   <span>
-                    <b>{d}</b>
+                    <Chip kind={t.c}>{t.n}</Chip>
                   </span>
-                  <Bar
-                    value={st.done + st.pend}
-                    max={Math.max(1, dept.tot)}
-                    color="var(--brand2)"
-                  />
-                  <span className="mono gr" style={{ textAlign: 'right' }}>
-                    {st.done + st.pend} of {dept.tot}
+                  <Bar value={b.left} max={Math.max(1, b.earned)} color="var(--brand2)" />
+                  <span className="mono" style={{ textAlign: 'right' }}>
+                    {b.left} of {b.earned}
                   </span>
                 </div>
               )
-            })
+            })}
+            <div style={{ marginTop: 12 }}>
+              <Btn variant="ghost" small onClick={() => navigate({ to: '/leave' })}>
+                Apply for leave
+              </Btn>
+            </div>
+          </Card>
+
+          <Card
+            padded
+            style={{
+              gridColumn: '-2 / -1',
+              alignSelf: 'stretch',
+              display: 'grid',
+              placeItems: 'center',
+            }}
+          >
+            <ScoreRing
+              band={band}
+              label={band ? `Quality score ${band.pct}%, ${band.label}` : 'No quality score to show'}
+            />
+          </Card>
+
+          {theirs.length ? (
+            <TeamWishes celebrations={theirs} title="Around the team" style={{ alignSelf: 'stretch' }} />
+          ) : null}
+        </div>
+
+        {risky.length ? (
+          <Banner
+            kind="d"
+            icon="⚑"
+            style={{ marginTop: 16 }}
+            title={`${risky.length} of yours ${risky.length === 1 ? 'is' : 'are'} behind where they should be`}
+          >
+            These are at the top of the list.{' '}
+            {risky.some((x) => x.p.doomed)
+              ? 'One or more cannot be finished in time — tell whoever runs your department now, not at five o’clock.'
+              : 'Still recoverable, but the slack is going.'}
+          </Banner>
+        ) : null}
+
+        <Card padded style={{ marginTop: 18 }}>
+          <div className="ch" style={{ border: 'none', padding: '0 0 10px' }}>
+            <Label>What you wrote</Label>
+            <div className="r">
+              <Btn small onClick={addUpdate}>
+                ＋ Add an update
+              </Btn>
+            </div>
+          </div>
+          {myUpdates.length ? (
+            <Rows bare>
+              {myUpdates.map((u) => updateRow(u, false))}
+            </Rows>
           ) : (
-            <p className="gr" style={{ fontSize: 'var(--t-small)', margin: 0 }}>
-              You are not in a department, so nothing can be assigned to you.
+            <p className="gr" style={{ fontSize: 'var(--t-body)', margin: 0 }}>
+              Nothing yet. A handover note written today is the thing that saves someone an hour
+              tomorrow.
             </p>
           )}
           <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 12 }}>
-            Your share of what your department handled today.
+            Updates cannot be edited once posted. That is what makes them worth reading back.
           </p>
         </Card>
+
+        <section className="mw-queue">
+          <SectionHead id="mwQueue">
+            {open.length ? `Your queue — ${open.length} to do` : 'Your queue is clear'}
+          </SectionHead>
+
+          {open.length ? (
+            <>
+              <Card>
+                <div className="tsc">
+                  <div style={{ minWidth: QMIN }}>
+                    <div className="trow h" style={{ gridTemplateColumns: QCOLS }}>
+                      <span>#</span>
+                      <span>Order</span>
+                      <span>Client</span>
+                      <span>Your stage</span>
+                      <span>Property</span>
+                      <span>Due</span>
+                      <span />
+                    </div>
+                    <div className="tb">
+                      {open.map(({ o, stage, hr }, i) => {
+                        const plan = orderPlan(o)
+                        const cp = plan.rows.find((r) => r.stage === stage)
+                        const openOrder = () =>
+                          navigate({ to: '/orders/$orderId', params: { orderId: o.id } })
+                        return (
+                          <div
+                            key={`${o.id}-${stage}-${i}`}
+                            className="trow"
+                            role="button"
+                            tabIndex={0}
+                            style={{ gridTemplateColumns: QCOLS, cursor: 'pointer' }}
+                            onClick={openOrder}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                openOrder()
+                              }
+                            }}
+                          >
+                            <div className="cell">
+                              <div className="gr mono" style={{ fontSize: 'var(--t-label)' }}>
+                                {i + 1}
+                              </div>
+                            </div>
+                            <div className="cell">
+                              <div className="v mono">{o.id}</div>
+                              <div className="s">arrived {hr}:00 {TZ}</div>
+                            </div>
+                            <div className="cell">
+                              <div className="v">{o.cl}</div>
+                              <div className="s">{o.pr}</div>
+                            </div>
+                            <div className="cell">
+                              <div className="v">{stage}</div>
+                              {cp?.behind ? (
+                                <div className="s bad">past your checkpoint</div>
+                              ) : cp ? (
+                                <div className="s gr">by {fmtDT(cp.at)} {TZ}</div>
+                              ) : null}
+                            </div>
+                            <div className="cell">
+                              <div className="v" style={{ fontSize: 'var(--t-small)' }}>
+                                {o.co ? `${o.co}, ${o.st}` : '—'}
+                              </div>
+                            </div>
+                            <div className="cell">
+                              <Due at={dueOf(o)} />
+                            </div>
+                            <div className="cell">
+                              <Btn
+                                variant="ghost"
+                                small
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openOrder()
+                                }}
+                              >
+                                Open
+                              </Btn>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+              <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 10 }}>
+                Ordered by when it arrived. Your checkpoint is your department’s slice of the client’s
+                promise — not the client deadline itself, which is later.
+              </p>
+            </>
+          ) : (
+            <Card padded>
+              <p className="gr" style={{ fontSize: 'var(--t-small)', margin: 0 }}>
+                Everything assigned to you today is done. {wk.done} stage{wk.done === 1 ? '' : 's'}{' '}
+                finished.
+              </p>
+            </Card>
+          )}
+
+        </section>
+
+        {wk.done ? (
+          <>
+            <SectionHead id="mwDone">Finished today — {wk.done}</SectionHead>
+            <Card>
+              <Rows bare>
+                {(showAllDone ? finished : finished.slice(0, 8)).map((i, idx) => (
+                  <div className="rw" key={`${i.o.id}-${i.stage}-${idx}`}>
+                    <span className="ok">✓</span>
+                    <span>
+                      <b className="mono" style={{ fontSize: 'var(--t-small)' }}>
+                        {i.o.id}
+                      </b>{' '}
+                      <span className="gr">{i.stage}</span>
+                      <div className="sd gr">
+                        {i.o.cl} · {i.o.pr}
+                      </div>
+                    </span>
+                    <span className="gr mono" style={{ fontSize: 'var(--t-label)' }}>
+                      {i.hr}:00
+                    </span>
+                  </div>
+                ))}
+                {finished.length > 8 && !showAllDone ? (
+                  <div className="rw">
+                    <span className="gr">·</span>
+                    <span className="gr" style={{ fontSize: 'var(--t-small)' }}>
+                      and {finished.length - 8} more
+                    </span>
+                    <span>
+                      <Btn variant="ghost" small onClick={() => setShowAllDone(true)}>
+                        Show all
+                      </Btn>
+                    </span>
+                  </div>
+                ) : null}
+              </Rows>
+            </Card>
+          </>
+        ) : null}
+
+        <div className="two" style={{ marginTop: 18 }}>
+          <Card padded>
+            <Label>Your quality</Label>
+            {!showScores ? (
+              <>
+                <p className="gr" style={{ fontSize: 'var(--t-small)', margin: 0 }}>
+                  Scores are not shown to the person rated on this account.
+                </p>
+                <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 10 }}>
+                  That is a company setting — <b>Quality → How scoring works → “Scores are visible to
+                  the person rated”</b>. It is off by default, on the view that ratings used for filing
+                  should not be read as a report card.
+                </p>
+              </>
+            ) : qcLog.isPending ? (
+              <SkeletonRows rows={3} cols={2} />
+            ) : rated.length && qavg !== null ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '8px 0 10px' }}>
+                  <ScoreGauge value={qavg} />
+                  <span className="gr">
+                    from {rated.length} checks · {range.label}
+                  </span>
+                </div>
+                {rated.filter((x) => x.note).length ? (
+                  <Rows bare>
+                    {rated
+                      .filter((x) => x.note)
+                      .slice(0, 4)
+                      .map((x, i) => (
+                        <div className="rw" key={`${x.order}-${i}`}>
+                          <span className="warn" style={{ fontSize: 'var(--t-lead)' }}>
+                            ⚑
+                          </span>
+                          <span>
+                            <b style={{ fontSize: 'var(--t-small)' }}>{x.note}</b>
+                            <div className="sd gr">
+                              {x.crit} · {x.order} · {x.dk}
+                            </div>
+                          </span>
+                          <span />
+                        </div>
+                      ))}
+                  </Rows>
+                ) : (
+                  <p className="gr" style={{ fontSize: 'var(--t-small)', margin: 0 }}>
+                    Nothing has been raised against your work in this range.
+                  </p>
+                )}
+                <Btn
+                  variant="ghost"
+                  small
+                  className="mwAll"
+                  onClick={() => navigate({ to: '/staff/$personId', params: { personId: me.id } })}
+                >
+                  All of it
+                </Btn>
+              </>
+            ) : (
+              <p className="gr" style={{ fontSize: 'var(--t-small)', margin: 0 }}>
+                Nothing of yours has been checked in this range.
+              </p>
+            )}
+          </Card>
+
+          <Card padded>
+            <Label>Where you fit</Label>
+            {me.dep.length ? (
+              me.dep.map((d) => {
+                const dept = dwork[d] ?? { tot: 0 }
+                const st = wk.stages[d] ?? { done: 0, pend: 0 }
+                return (
+                  <div
+                    key={d}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '130px 1fr 110px',
+                      gap: 12,
+                      alignItems: 'center',
+                      padding: '7px 0',
+                      fontSize: 'var(--t-small)',
+                    }}
+                  >
+                    <span>
+                      <b>{d}</b>
+                    </span>
+                    <Bar
+                      value={st.done + st.pend}
+                      max={Math.max(1, dept.tot)}
+                      color="var(--brand2)"
+                    />
+                    <span className="mono gr" style={{ textAlign: 'right' }}>
+                      {st.done + st.pend} of {dept.tot}
+                    </span>
+                  </div>
+                )
+              })
+            ) : (
+              <p className="gr" style={{ fontSize: 'var(--t-small)', margin: 0 }}>
+                You are not in a department, so nothing can be assigned to you.
+              </p>
+            )}
+            <p className="gr" style={{ fontSize: 'var(--t-small)', marginTop: 12 }}>
+              Your share of what your department handled today.
+            </p>
+          </Card>
+        </div>
       </div>
     </>
   )

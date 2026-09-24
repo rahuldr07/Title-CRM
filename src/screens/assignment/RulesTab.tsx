@@ -526,9 +526,9 @@ export function RulesTab({ board, onTab }: { board: AssignmentBoard; onTab: (t: 
               <div className="bnr r" style={{ margin: 0 }}>
                 <span className="bi">⚑</span>
                 <div>
-                  <b>The board still shows placement on arrival.</b> The setting is saved and would be
-                  read by a real engine — this build only simulates the one behaviour, and drawing the
-                  others would be inventing a result.
+                  <b>The board still shows placement on arrival.</b> The setting is saved; the board
+                  models placement on arrival only, and drawing the others would be inventing a
+                  result.
                 </div>
               </div>
             ) : null}
