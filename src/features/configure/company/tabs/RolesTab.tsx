@@ -1,4 +1,6 @@
 import { Btn } from '@/shared/ui/Button'
+import { Banner } from '@/shared/ui/Banner'
+import { useSession } from '@/domain/auth/SessionProvider'
 import { Card, CardHead } from '@/shared/ui/Card'
 import { Rows } from '@/shared/ui/DetailList'
 import { SecHead } from '@/shared/ui/PageHead'
@@ -21,6 +23,7 @@ export function RolesTab({
   onOpenStaff: () => void
 }) {
   const { openModal, closeModal, toast } = useUi()
+  const { authority } = useSession()
   const ROLELIST = useRoles()
   const PERMS = usePerms()
   const STAFF = useStaff()
@@ -119,6 +122,12 @@ export function RolesTab({
           </>
         }
       />
+      {authority === 'server' ? (
+        <Banner kind="r" title="The server decides what each role can do">
+          While the server is connected, it holds every role's capabilities. Changes made here edit this
+          workspace's local roles and do not change what anyone can do until roles are managed on the server.
+        </Banner>
+      ) : null}
 
       <Card>
         <div className="tsc">

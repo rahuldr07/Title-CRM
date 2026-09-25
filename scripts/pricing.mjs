@@ -24,8 +24,9 @@ const launchOptions = {
 const browser = await chromium.launch(launchOptions)
 const problems = []
 
-const signIn = async (email) => {
+const signIn = async (email, { seedOnly = false } = {}) => {
   const context = await browser.newContext()
+  if (seedOnly) await context.route('**/api/**', (r) => r.abort())
   const page = await context.newPage()
   await page.goto(BASE + '/signin', { waitUntil: 'domcontentloaded', timeout: 15_000 })
   await page.waitForSelector('main input[type="email"]', { timeout: 15_000 })
@@ -69,7 +70,7 @@ try {
   }
   await page.context().close()
 
-  const admin = await signIn(ADMIN_EMAIL)
+  const admin = await signIn(ADMIN_EMAIL, { seedOnly: true })
   await admin.goto(BASE + '/company?tab=Roles', { waitUntil: 'domcontentloaded', timeout: 15_000 })
   await admin.locator('main button[title="Edit Company admin"]').click()
   const dialog = admin.locator('[role="dialog"]')
