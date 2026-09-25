@@ -2,16 +2,26 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "saiweb",
+      "name": "title-crm",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "web",
+        "run",
+        "dev"
+      ],
       "port": 5173,
       "autoPort": true
     },
     {
-      "name": "saiweb-preview",
+      "name": "title-crm-preview",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "preview"],
+      "runtimeArgs": [
+        "--prefix",
+        "web",
+        "run",
+        "preview"
+      ],
       "port": 4173,
       "autoPort": true
     }
