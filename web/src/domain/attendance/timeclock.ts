@@ -26,8 +26,6 @@ const store = createStore<Ledger>({
 
 export const useLedger = (): Ledger => useStore(store)
 
-export const currentLedger = (): Ledger => store.get()
-
 export type Decider = Pick<Person, 'id' | 'n' | 'r'>
 
 const ATTENDANCE_DECIDER = 'all'
@@ -133,5 +131,3 @@ export function setWaived(actor: Actor, id: string, waived: boolean): string | n
   store.update((l) => ({ ...l, late: l.late.map((x) => (x.id === id ? { ...x, waived } : x)) }))
   return null
 }
-
-export const resetTimeclock = store.reset

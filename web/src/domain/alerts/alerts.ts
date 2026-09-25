@@ -8,7 +8,7 @@ import { followUpCount } from '@/domain/leads/leads'
 import { now } from '@/shared/lib/clock'
 import { daysSince, fmtDate } from '@/shared/lib/format'
 
-export const thinDepts = () =>
+const thinDepts = () =>
   currentDepts().filter(
     (d) => currentStaff().filter((x) => x.dep.includes(d.n) && x.active !== false && x.avail === 'ok').length === 0,
   )

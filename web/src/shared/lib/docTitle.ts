@@ -1,4 +1,4 @@
-export const APP_NAME = 'Title CRM'
+const APP_NAME = 'Title CRM'
 
 export interface TitleParts {
   page?: string | undefined
@@ -6,7 +6,7 @@ export interface TitleParts {
   workspace?: string | undefined
 }
 
-export const docTitle = ({ page, tab, workspace }: TitleParts): string =>
+const docTitle = ({ page, tab, workspace }: TitleParts): string =>
   [tab === page ? undefined : tab, page, workspace, APP_NAME].filter((p): p is string => !!p).join(' · ')
 
 const parts: TitleParts = {}

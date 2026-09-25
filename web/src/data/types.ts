@@ -366,7 +366,7 @@ export interface LeavePolicy {
   approver: string
 }
 
-export interface AttendanceRow {
+interface AttendanceRow {
   days: number
   working: number
   hol: number

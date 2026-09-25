@@ -62,7 +62,7 @@ export function dayLoadOf(person: Loaded, orders: readonly EditedOrder[] = allOr
 
 export const useDayLoad = (person: Loaded): DayLoad => dayLoadOf(person, useOrders())
 
-export const dayLoadsOf = (people: readonly Loaded[], orders: readonly EditedOrder[] = allOrders()): Record<string, DayLoad> =>
+const dayLoadsOf = (people: readonly Loaded[], orders: readonly EditedOrder[] = allOrders()): Record<string, DayLoad> =>
   Object.fromEntries(people.map((p) => [p.id, dayLoadOf(p, orders)]))
 
 export function useDayLoads(people: readonly Loaded[]): Record<string, DayLoad> {

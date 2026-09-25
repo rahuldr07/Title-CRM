@@ -52,8 +52,6 @@ export { SEEDED_TENANT_ID }
 const withProfile = (tenants: readonly Tenant[], profile: Profile): Tenant[] =>
   tenants.map((t) => (t.id === SEEDED_TENANT_ID ? { ...t, name: profile.name, state: profile.state } : t))
 
-export const currentWorkspaces = (): Tenant[] => withProfile(companyStore.get().tenants, companyStore.get().profile)
-
 export function useWorkspaces(): Tenant[] {
   const tenants = useStoreSlice(companyStore, (c) => c.tenants)
   const profile = useProfile()

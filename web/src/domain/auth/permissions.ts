@@ -28,8 +28,6 @@ export function setServerAuthority(id: string | null, caps: readonly string[] | 
 
 export const useAuthority = () => useStore(authority)
 
-export const resetAuthority = authority.reset
-
 type Holder = Pick<Person, 'r'> & { id?: string }
 
 const serverFor = (person: Holder) => {

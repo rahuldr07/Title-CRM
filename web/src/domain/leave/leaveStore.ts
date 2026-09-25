@@ -77,7 +77,7 @@ export function setLeavePolicy<K extends keyof LeavePolicy>(actor: Actor, k: K, 
   return null
 }
 
-export const leaveTypeKey = (name: string, count: number): string =>
+const leaveTypeKey = (name: string, count: number): string =>
   name.trim().toLowerCase().replace(/[^a-z]/g, '').slice(0, 4) || `t${count}`
 
 export function saveLeaveType(actor: Actor, next: LeaveType, k?: string): string | null {
@@ -103,5 +103,3 @@ export function removeLeaveType(actor: Actor, k: string): string | null {
   store.update((s) => ({ ...s, types: s.types.filter((t) => t.k !== k) }))
   return null
 }
-
-export const resetLeave = store.reset

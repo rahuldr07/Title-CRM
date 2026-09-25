@@ -65,7 +65,3 @@ export function markRead(me: string, other: string): void {
   if ((s.read[readKey(me, other)] ?? 0) >= last) return
   store.set({ ...s, read: { ...s.read, [readKey(me, other)]: last } })
 }
-
-export const chatState = store.get
-
-export const resetChats = store.reset

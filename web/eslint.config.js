@@ -226,10 +226,6 @@ export default tseslint.config(
     rules: syntax(APP_PATTERNS, { clock: false, screen: true }),
   },
   {
-    files: ['tests/db/**/*.ts'],
-    rules: { 'no-restricted-syntax': 'off' },
-  },
-  {
     files: ['server/**/*.ts', 'api/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', { patterns: SERVER }],

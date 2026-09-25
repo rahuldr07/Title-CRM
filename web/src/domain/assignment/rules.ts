@@ -75,5 +75,3 @@ export function setEngine<K extends keyof EngineConfig>(actor: Actor, k: K, v: E
   store.update((s) => ({ ...s, engine: { ...s.engine, [k]: v } }))
   return ENGINEOPTS[k].find((o) => o[0] === v)?.[1] ?? String(v)
 }
-
-export const resetRules = store.reset

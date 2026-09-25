@@ -50,7 +50,7 @@ export function dueFor(client: string, product: string, tier: string): Due {
   return { h, at: hrs(h), base }
 }
 
-export const sharesFor = (pr: string): Record<string, number> => {
+const sharesFor = (pr: string): Record<string, number> => {
   const b = currentBudget()
   return b.over.find((x) => x.pr === pr)?.shares ?? b.base
 }

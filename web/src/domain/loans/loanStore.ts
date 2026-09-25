@@ -135,5 +135,3 @@ export function recoverForRun(actor: Actor, mn: string, personIds: string[]): st
   }))
   return null
 }
-
-export const resetLoans = store.reset

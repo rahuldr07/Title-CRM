@@ -18,11 +18,6 @@ export function pettyLedger(entries: PettyEntry[]): LedgerRow[] {
     })
 }
 
-export const pettyBalance = (entries: PettyEntry[]): number => {
-  const l = pettyLedger(entries)
-  return l[l.length - 1]?.after ?? 0
-}
-
 export function expectedAt(entries: PettyEntry[], at: Date): number {
   const upto = pettyLedger(entries).filter((e) => e.d <= at)
   return upto[upto.length - 1]?.after ?? 0

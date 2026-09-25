@@ -10,7 +10,7 @@ export const shiftByKey = (k: string): Shift => SHIFTS.find((x) => x.k === k) ??
 
 export const shiftOf = (p: Pick<Person, 'shift'>): Shift => shiftByKey(p.shift || 'day')
 
-export const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`
+const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`
 
 export const clockNow = (): string => hhmm(toIst(now()))
 
@@ -30,7 +30,7 @@ export const hm = (v: number) => `${Math.floor(v / 60)}h ${pad(v % 60)}m`
 export const worked = (m: DayMark | null | undefined) =>
   m && m.in && m.out ? Math.max(0, mins(m.out) - mins(m.in)) : 0
 
-export const metres = (aLat: number, aLng: number, bLat: number, bLng: number) => {
+const metres = (aLat: number, aLng: number, bLat: number, bLng: number) => {
   const R = 6371000
   const r = (x: number) => (x * Math.PI) / 180
   const dLat = r(bLat - aLat)
@@ -43,7 +43,7 @@ export const metres = (aLat: number, aLng: number, bLat: number, bLng: number) =
 const nearestSite = (lat: number, lng: number) =>
   SITES.map((s) => ({ s, d: metres(lat, lng, s.lat, s.lng) })).sort((x, y) => x.d - y.d)[0]
 
-export const distance = (d: number) => (d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${d} m`)
+const distance = (d: number) => (d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${d} m`)
 
 export interface Fix {
   lat: number

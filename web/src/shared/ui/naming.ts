@@ -10,7 +10,7 @@ export interface NameAttrs {
   'aria-invalid': true | undefined
 }
 
-export const OUTSIDE_FIELD = 'A control marked `field` is named by its <Field>, so it must sit inside one.'
+const OUTSIDE_FIELD = 'A control marked `field` is named by its <Field>, so it must sit inside one.'
 
 export function nameOf(
   named: { label?: string | undefined; field?: boolean | undefined },

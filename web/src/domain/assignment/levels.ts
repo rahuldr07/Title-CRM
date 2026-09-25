@@ -34,9 +34,7 @@ const levelIdIn =
   (id: string): string | null =>
     id in book.moved ? (book.moved[id] ?? null) : (findPerson(staff, id)?.lvl ?? null)
 
-export const currentLevels = (): Level[] => store.get().levels
-
-export const personLevelOf = (id: string): string | null => levelIdIn(store.get(), currentStaff())(id)
+const personLevelOf = (id: string): string | null => levelIdIn(store.get(), currentStaff())(id)
 
 let memo: { book: LevelBook; counties: County[]; staff: Person[]; cov: Coverage } | null = null
 
@@ -55,7 +53,7 @@ export const coversPlace = (id: string, st: string, co: string | null): boolean 
 
 export const coversProduct = (id: string, pr: string): boolean => currentCoverage().coversProduct(id, pr)
 
-export const LEVEL_EDITOR = 'assign'
+const LEVEL_EDITOR = 'assign'
 
 const levelRefusal = (actor: Actor) => refusal(actor, LEVEL_EDITOR, 'Changing a level or who is on it')
 
@@ -78,7 +76,7 @@ const countyNamesIn = (st: string) =>
     .map((c) => c.n)
     .sort()
 
-export function setCov(actor: Actor, lid: string, k: CovKey, v?: string): string | null {
+function setCov(actor: Actor, lid: string, k: CovKey, v?: string): string | null {
   const refused = levelRefusal(actor)
   if (refused) return refused
   edit(lid, (l) => {
@@ -111,7 +109,7 @@ export function setCov(actor: Actor, lid: string, k: CovKey, v?: string): string
   return null
 }
 
-export function setCounty(actor: Actor, lid: string, st: string, co: string): string | null {
+function setCounty(actor: Actor, lid: string, st: string, co: string): string | null {
   const refused = levelRefusal(actor)
   if (refused) return refused
   edit(lid, (l) => {
@@ -127,7 +125,7 @@ export function setCounty(actor: Actor, lid: string, st: string, co: string): st
   return null
 }
 
-export function addCounty(actor: Actor, st: string, name: string): { ok: true } | { ok: false; error: string } {
+function addCounty(actor: Actor, st: string, name: string): { ok: true } | { ok: false; error: string } {
   const n = name.trim()
   if (!n) return { ok: false, error: 'A county name is required.' }
   if (isDuplicateName(currentCounties().filter((c) => c.st === st), n, (c) => c.n))
@@ -137,7 +135,7 @@ export function addCounty(actor: Actor, st: string, name: string): { ok: true } 
   return refused ? { ok: false, error: refused } : { ok: true }
 }
 
-export function setPersonLevel(actor: Actor, id: string, lid: string): string {
+function setPersonLevel(actor: Actor, id: string, lid: string): string {
   const refused = levelRefusal(actor)
   if (refused) return refused
   store.update((b) => ({ ...b, moved: { ...b.moved, [id]: lid || null } }))
@@ -150,7 +148,7 @@ function selectLevel(id: string): void {
   store.update((b) => ({ ...b, selected: id }))
 }
 
-export function addLevel(actor: Actor): Saved {
+function addLevel(actor: Actor): Saved {
   const refused = levelRefusal(actor)
   if (refused) return { id: null, refused }
   const { levels } = store.get()
@@ -180,7 +178,7 @@ function setLevelNote(actor: Actor, lid: string, v: string): string | null {
   return null
 }
 
-export function removeLevel(
+function removeLevel(
   actor: Actor,
   lid: string,
 ): { ok: true } | { ok: false; held: Person[]; refused: string | null } {
@@ -217,5 +215,3 @@ export function useLevels(me: Actor) {
     remove: (lid: string) => removeLevel(me, lid),
   }
 }
-
-export const resetLevels = store.reset

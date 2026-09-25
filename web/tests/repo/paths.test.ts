@@ -22,16 +22,6 @@ function caseClashes(paths: readonly string[]): string[][] {
   return [...byKey.values()].filter((group) => group.length > 1)
 }
 
-function orphanTests(paths: readonly string[]): string[] {
-  const have = new Set(paths)
-  return paths.filter((p) => {
-    const m = /^(.*\/)([^/.]+)(\.[^/]+)?\.test\.ts$/.exec(p)
-    if (!m) return false
-    const [, dir, module] = m
-    return !have.has(`${dir}${module}.ts`) && !have.has(`${dir}${module}.tsx`)
-  })
-}
-
 describe('paths', () => {
   it('finds two names an import cannot tell apart on a case-insensitive disk', () => {
     expect(caseClashes(['src/a/LeavePolicy.tsx', 'src/a/leavePolicy.ts', 'src/a/other.ts'])).toEqual([
@@ -47,15 +37,8 @@ describe('paths', () => {
     expect(caseClashes(paths)).toEqual([])
   })
 
-  it('finds a test named after no module beside it', () => {
-    expect(
-      orphanTests(['src/a/leads.ts', 'src/a/leads.test.ts', 'src/a/leads.book.test.ts', 'src/a/leadBook.test.ts', 'src/a/Page.tsx', 'src/a/Page.test.ts']),
-    ).toEqual(['src/a/leadBook.test.ts'])
-  })
-
-  it('names every test under src/ after the module beside it, as <module>.test.ts or <module>.<topic>.test.ts', () => {
-    const paths = walk('src')
-    expect(paths.filter((p) => p.endsWith('.test.ts')).length).toBeGreaterThan(80)
-    expect(orphanTests(paths)).toEqual([])
+  it('keeps tests only in tests/repo', () => {
+    const stray = [...walk('src'), ...walk('server'), ...walk('api')].filter((p) => p.endsWith('.test.ts'))
+    expect(stray).toEqual([])
   })
 })

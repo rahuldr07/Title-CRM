@@ -24,7 +24,7 @@ export interface FlatLink {
   l: CountyLink
 }
 
-export const allLinks = (): FlatLink[] =>
+const allLinks = (): FlatLink[] =>
   COUNTIES_OF().flatMap((c) =>
     LINKTYPES_OF().flatMap((t) => {
       const l = c.links[t.k]
@@ -34,7 +34,7 @@ export const allLinks = (): FlatLink[] =>
 
 export const isBrokenLink = (l: CountyLink | undefined): boolean => !!l && BADSTATES.includes(l.s)
 
-export const isMissingLink = (l: CountyLink | undefined): boolean => !l || l.s === 'none'
+const isMissingLink = (l: CountyLink | undefined): boolean => !l || l.s === 'none'
 
 export const brokenLinks = () => allLinks().filter((x) => isBrokenLink(x.l))
 

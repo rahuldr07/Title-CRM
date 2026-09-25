@@ -15,5 +15,3 @@ export function setTimeRule<K extends keyof TimeRules>(actor: Actor, k: K, v: Ti
   store.update((s) => ({ ...s, [k]: v }))
   return null
 }
-
-export const resetTimeRules = store.reset

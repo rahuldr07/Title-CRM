@@ -85,7 +85,7 @@ function refusal(
   }
 }
 
-export function runDay(days: DayBucket[], overrides: Partial<RunContext> = {}): RunResult {
+function runDay(days: DayBucket[], overrides: Partial<RunContext> = {}): RunResult {
   const cx: RunContext = { ...defaultContext(), ...overrides }
   const { staff: STAFF, rules: RULES, assignStages: ASSIGN_STAGES } = cx
 

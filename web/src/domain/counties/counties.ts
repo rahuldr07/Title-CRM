@@ -29,7 +29,7 @@ export const currentCheck = (): LinkCheckConfig => store.get().check
 export const countyName = (county: string, state: string): string =>
   state === 'AK' ? `${county} Recording District` : state === 'LA' ? `${county} Parish` : `${county} County`
 
-export const sameCounty = (c: County, n: string, st: string) =>
+const sameCounty = (c: County, n: string, st: string) =>
   c.n.toLowerCase() === n.toLowerCase().trim() && c.st === st
 
 export function saveCounty(
@@ -90,7 +90,7 @@ export function saveLink(
   return null
 }
 
-export const linkTypeKey = (name: string) =>
+const linkTypeKey = (name: string) =>
   name.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 20) || 'link'
 
 export function saveLinkType(actor: Actor, t: { n: string; note: string; req: boolean }, k?: string): string | null {
@@ -181,5 +181,3 @@ export function runLinkCheck(actor: Actor): { refused: string | null; checked: n
   store.set({ ...coverage, counties, check: { ...coverage.check, last: now() } })
   return { refused: null, checked }
 }
-
-export const resetCoverage = store.reset

@@ -36,5 +36,3 @@ export function decideOvertime(
   store.update((list) => list.map((x) => (x.id === id ? { ...x, st, by: decider.n } : x)))
   return null
 }
-
-export const resetOvertime = store.reset

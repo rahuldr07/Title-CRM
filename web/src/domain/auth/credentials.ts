@@ -8,15 +8,15 @@ export const ADMIN_EMAIL = 'hari@gmail.com'
 
 const normalise = (email: string) => email.trim().toLowerCase()
 
-export const personByEmail = (email: string): Person | undefined =>
+const personByEmail = (email: string): Person | undefined =>
   currentStaff().find((s) => (s.e ?? '').toLowerCase() === normalise(email))
 
 const active = () => currentStaff().filter((s) => s.active !== false)
 
-export const adminAccount = (): Person | undefined =>
+const adminAccount = (): Person | undefined =>
   active().find((s) => can(s, 'all') && can(s, 'people'))
 
-export const staffAccount = (): Person | undefined =>
+const staffAccount = (): Person | undefined =>
   active().find((s) => s.dep.length > 0 && !can(s, 'all'))
 
 export interface CredentialOptions {

@@ -22,5 +22,3 @@ export function recordPayment(actor: Actor, invoiceId: string, amount: number): 
   store.update((all) => ({ ...all, [invoiceId]: r2((all[invoiceId] ?? 0) + amount) }))
   return null
 }
-
-export const resetPayments = store.reset

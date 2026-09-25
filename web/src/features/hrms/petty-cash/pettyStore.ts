@@ -42,5 +42,3 @@ export function setConfig<K extends keyof PettyConfig>(actor: Actor, key: K, val
   store.update((box) => ({ ...box, cfg: { ...box.cfg, [key]: value } }))
   return null
 }
-
-export const resetBox = store.reset

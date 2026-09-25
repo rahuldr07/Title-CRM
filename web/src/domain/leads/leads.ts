@@ -6,7 +6,7 @@ import type { Lead } from '@/data/types'
 
 const store = createStore<Lead[]>(LEADS)
 
-export const currentLeads = (): Lead[] => store.get()
+const currentLeads = (): Lead[] => store.get()
 export const useLeads = (): Lead[] => useStore(store)
 export const leadById = (id: string, leads: readonly Lead[] = currentLeads()): Lead | undefined =>
   leads.find((l) => l.id === id)
@@ -36,8 +36,6 @@ export function updateLead(actor: Actor, id: string, fn: (l: Lead) => Lead): str
   store.update((all) => all.map((l) => (l.id === id ? fn(l) : l)))
   return null
 }
-
-export const resetLeads = store.reset
 
 export const lastTouch = (l: Lead) =>
   l.notes.reduce((a, n) => (n.at > a ? n.at : a), l.notes[0]?.at ?? new Date(0))

@@ -18,8 +18,6 @@ const store = createStore<Board>({ candidates: CANDIDATES, openings: OPENINGS })
 
 export const useBoard = (): Board => useStore(store)
 
-export const currentBoard = (): Board => store.get()
-
 export const nextStage = (stage: HireStage): HireStage | null =>
   HIRESTAGES[HIRESTAGES.indexOf(stage) + 1] ?? null
 
@@ -57,5 +55,3 @@ export function addOpening(actor: Actor, draft: OpeningDraft): Saved {
   store.update((board) => ({ ...board, openings: [opening, ...board.openings] }))
   return { id, refused: null }
 }
-
-export const resetHiringBoard = store.reset

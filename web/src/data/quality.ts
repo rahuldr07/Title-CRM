@@ -60,33 +60,6 @@ export const QC_FIX: Record<string, string> = {
     'Write "Not Available" in full. N/A is read as "not applicable", which is a different claim.',
 }
 
-export const QC_REASONS: Record<string, string[]> = {
-  Accuracy: [
-    'Book/Page transposed from the index',
-    'Grantee spelled from the deed, not the recorded index',
-    'Consideration taken from the wrong instrument',
-    'Mortgage amount out by a digit',
-    'Instrument # belongs to the assignment, not the mortgage',
-    'Effective date read as the execution date',
-  ],
-  Completeness: [
-    'Open 2019 mortgage not reported',
-    'Judgment search missing for the co-borrower',
-    'Prior effective date not carried forward on an update',
-    'Current tax year not shown',
-    'Legal description truncated at the metes call',
-    'Assignment chain stops before the current holder',
-  ],
-  Formatting: [
-    'Dates entered DD/MM in a US report',
-    'Money written without cents',
-    'Names in caps where this client wants Title Case',
-    'Book/Page given where the client uses Instrument #',
-    'County name omitted from the property address',
-    'Not Available written as N/A',
-  ],
-}
-
 let pending: Promise<QcEntry[]> | null = null
 
 export function loadQcLog(): Promise<QcEntry[]> {

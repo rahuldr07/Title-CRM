@@ -62,7 +62,7 @@ export function readEnabled(body: unknown): Read<boolean> {
   return { ok: true, value: b.enabled }
 }
 
-export const DATE_FORMATS = ['MM/DD/YYYY', 'DD/MM/YYYY'] as const
+const DATE_FORMATS = ['MM/DD/YYYY', 'DD/MM/YYYY'] as const
 
 export interface SettingsPatch {
   dateFormat?: string

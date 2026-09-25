@@ -10,7 +10,7 @@ export interface Space {
   bottom?: number
 }
 
-export const space = ({ margin, top, bottom }: Space): CSSProperties => ({
+const space = ({ margin, top, bottom }: Space): CSSProperties => ({
   ...(margin === undefined ? {} : { margin }),
   ...(top === undefined ? {} : { marginTop: top }),
   ...(bottom === undefined ? {} : { marginBottom: bottom }),

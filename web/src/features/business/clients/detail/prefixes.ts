@@ -43,5 +43,3 @@ export function removePrefix(actor: Actor, clientName: string, value: string): s
   }))
   return null
 }
-
-export const resetPrefixes = store.reset

@@ -11,7 +11,7 @@ export const INVOICE_MONTHS: string[] = [
   ).keys(),
 ]
 
-export function monthBounds(month: string): [string, string] {
+function monthBounds(month: string): [string, string] {
   const [mon, year] = month.split(' ')
   const m = MONTHS.indexOf(mon ?? '')
   const y = Number(year)
@@ -91,7 +91,7 @@ export const balance = (i: Invoice) => r2(i.amt - i.paid)
 
 export const outstandingOf = (list: Invoice[]) => r2(sumBy(list, 'amt') - sumBy(list, 'paid'))
 
-export type InvoiceStatus = Invoice['st']
+type InvoiceStatus = Invoice['st']
 
 const termDays = (terms: string): number => Number(/net\s*(\d+)/i.exec(terms)?.[1] ?? 0)
 
@@ -102,7 +102,7 @@ function dueOn(i: Invoice, terms: string): Date {
   return d
 }
 
-export function statusOf(i: Invoice, terms: string, today: Date = now()): InvoiceStatus {
+function statusOf(i: Invoice, terms: string, today: Date = now()): InvoiceStatus {
   if (balance(i) <= 0) return 'paid'
   if (today > dueOn(i, terms)) return 'overdue'
   return i.paid > 0 ? 'part' : 'open'

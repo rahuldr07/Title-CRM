@@ -3,7 +3,7 @@ import { checkpoints } from '@/domain/assignment/sla'
 import { ASSIGN_STAGES } from '@/data/org'
 import type { Delivery } from '@/data/deliveries'
 
-export const budgetFor = (x: Delivery, stage: string) =>
+const budgetFor = (x: Delivery, stage: string) =>
   checkpoints(x.slaH, x.pr).find((y) => y.stage === stage)?.hours ?? 0
 
 const spentOn = (x: Delivery, stage: string) => x.st[stage] ?? 0
@@ -14,7 +14,7 @@ interface Overrun {
   c: number
 }
 
-export const overruns = (x: Delivery): Overrun[] =>
+const overruns = (x: Delivery): Overrun[] =>
   ASSIGN_STAGES.map((st) => ({ st, h: spentOn(x, st), c: budgetFor(x, st) }))
     .filter((y) => y.h > y.c)
     .sort((a, b) => b.h - b.c - (a.h - a.c))

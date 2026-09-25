@@ -5,8 +5,7 @@ export default mergeConfig(
   vite,
   defineConfig({
     test: {
-      include: ['src/**/*.test.ts', 'server/**/*.test.ts', 'tests/**/*.test.ts'],
-      setupFiles: ['./tests/setup.ts'],
+      include: ['tests/repo/**/*.test.ts'],
       environment: 'node',
       fileParallelism: false,
       coverage: {

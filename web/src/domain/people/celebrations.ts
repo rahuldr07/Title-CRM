@@ -11,7 +11,7 @@ export interface Celebration {
   inDays: number
 }
 
-export function anniversaryIn(original: Date, year: number): Date {
+function anniversaryIn(original: Date, year: number): Date {
   const month = original.getMonth()
   const day = original.getDate()
   const candidate = new Date(year, month, day)
@@ -33,10 +33,6 @@ function next(person: Person, raw: string, kind: CelebrationKind, on: Date): Cel
 }
 
 const eligible = (staff: Person[]) => staff.filter((p) => p.active !== false)
-
-export function celebrationsOn(staff: Person[], on: Date): Celebration[] {
-  return celebrationsWithin(staff, on, 0)
-}
 
 export function celebrationsWithin(staff: Person[], on: Date, days: number): Celebration[] {
   const found: Celebration[] = []

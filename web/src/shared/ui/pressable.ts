@@ -1,4 +1,4 @@
-export const activates = (key: string): boolean => key === 'Enter' || key === ' '
+const activates = (key: string): boolean => key === 'Enter' || key === ' '
 
 const CONTROL = 'a,button,input,select,textarea,label,[role=button],[role=link]'
 
@@ -6,7 +6,7 @@ interface Closest {
   closest?: (selector: string) => unknown
 }
 
-export const fromInnerControl = (target: unknown, currentTarget: unknown): boolean => {
+const fromInnerControl = (target: unknown, currentTarget: unknown): boolean => {
   if (target === currentTarget) return false
   const hit = (target as Closest | null)?.closest?.(CONTROL) ?? null
   return hit !== null && hit !== currentTarget

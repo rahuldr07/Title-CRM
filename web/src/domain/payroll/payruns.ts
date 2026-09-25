@@ -77,5 +77,3 @@ export function setRunState(actor: Pick<Person, 'id' | 'r' | 'n'>, mn: string, t
   })
   return null
 }
-
-export const resetRuns = store.reset

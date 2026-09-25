@@ -13,16 +13,16 @@ import type { PayConfig, Person, RunState } from '@/data/types'
 
 const ESI_EMPLOYER_PCT = 3.25
 
-export const monthOf = (mmddyyyy: string) => {
+const monthOf = (mmddyyyy: string) => {
   const [m, , y] = mmddyyyy.split('/').map(Number)
   if (m === undefined || y === undefined || MONTHS[m - 1] === undefined) return ''
   return monthLabel(new Date(y, m - 1, 1))
 }
 
-export const otMinsFor = (id: string, mn: string, list: Overtime[] = currentOvertime()) =>
+const otMinsFor = (id: string, mn: string, list: Overtime[] = currentOvertime()) =>
   list.filter((o) => o.who === id && o.st === 'approved' && monthOf(o.d) === mn).reduce((a, o) => a + o.mins, 0)
 
-export function otPay(
+function otPay(
   p: Person,
   mn: string,
   cfg: PayConfig = currentPayCfg(),
@@ -36,7 +36,7 @@ export function otPay(
   return Math.round(perHour * (mins / 60) * currentTimeRules().otRate)
 }
 
-export function payableDays(p: Person, mn: string, working: number): number {
+function payableDays(p: Person, mn: string, working: number): number {
   if (!p.doj) return working
   const [m, d, y] = p.doj.split('/').map(Number)
   const [mon, yr] = mn.split(' ')

@@ -58,10 +58,6 @@ export function ruleEffectParts(
   ]
 }
 
-export function ruleEffect(r: Rule, fired: number, narrowed: number | undefined): string {
-  return ruleEffectParts(r, fired, narrowed).join('')
-}
-
 const UNREMOVABLE = ['r2', 'r3', 'r5', 'r6', 'r7']
 
 export const canRemove = (r: Rule) => !r.lock && !UNREMOVABLE.includes(r.id)

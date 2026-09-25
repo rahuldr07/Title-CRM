@@ -31,8 +31,7 @@ files — nothing in the file you are editing will tell you about them.
 
 ```bash
 npm run dev                              # front end on :5173, seed data, no database needed
-npx vitest run src/domain/assignment/sla.test.ts   # one test file
-npx vitest run -t 'self-review'          # tests whose name matches
+npx vitest run tests/repo/paths.test.ts  # one test file
 ```
 
 The API side:
@@ -52,18 +51,14 @@ is the only one the server uses; the server refuses to start if its role would
 bypass the policies. Seeded accounts sign in with any seeded email and the
 password `titlecrm-dev`. Without a database the build signs in on seed data
 (`VITE_DEMO_IDENTITY`, `src/shared/lib/demo.ts`), which checks no password and
-must be off before real records are connected. `tests/db`
-skips itself when `APP_DATABASE_URL` is unset, so a green `npm test` locally may
-not have run the isolation suite — CI runs it against a real Postgres. Test files
-run serially (`fileParallelism: false` in `vitest.config.ts`) because the
-isolation tests share one database.
+must be off before real records are connected.
 
 ## Gates
 
 ```bash
 npm run lint        # eslint . --max-warnings 0
 npm run typecheck   # tsc -b
-npm test            # vitest run
+npm test            # vitest run: the repository rules in tests/repo
 npm run build       # tsc -b && vite build
 npm run knip        # knip
 ```
@@ -105,21 +100,18 @@ the register disagreed with, and the stamped value could not be pinned in a test
 — the selector rejects only the zero-argument form and `Date.now()`.
 
 The restriction is scoped to `**/*.{ts,tsx}`, so the `.mjs` scripts are outside
-it by file type. Four paths are exempted explicitly, each in its own config
+it by file type. Three paths are exempted explicitly, each in its own config
 block: `clock.ts` and `main.tsx` drop only the clock selectors and keep the
 dynamic-`import()` boundary selectors that share `no-restricted-syntax` with
-them (invariant 7), the server keeps only its own dynamic-import selectors, and
-`tests/db` turns the rule off:
+them (invariant 7), and the server keeps only its own dynamic-import selectors:
 
 | Path | Why |
 | --- | --- |
 | `src/shared/lib/clock.ts` | where the clock is defined |
-| `src/app/main.tsx` | the entry point, the one place that may call `setClock(() => new Date())`. It holds no clock call today, so the application runs pinned. |
+| `src/app/main.tsx` | the entry point, the one place allowed to read the wall clock once the application stops running pinned. It holds no clock call today. |
 | `server/**/*.ts` | the server has no seed clock to pin |
-| `tests/db/**/*.ts` | fixture keys must be unique per run rather than reproducible |
 
-A test that needs a different date calls `setClock`, and `resetClock` after
-(`src/shared/lib/clock.ts`, `src/shared/lib/clock.test.ts`). The company's SLA-clock
+The company's SLA-clock
 setting is `setSlaClock()` in `src/domain/assignment/turnaround.ts` and has nothing to
 do with this one.
 
@@ -225,8 +217,8 @@ not parse, naming the format (`src/shared/lib/format.ts`).
 
 Renaming them makes the seed data and the design disagree, and a regeneration
 would put them straight back. For the same reason, a defect fixed in the
-generated output is a defect a regeneration reintroduces:
-`tests/data/dates.test.ts` exists as the guard against exactly that. The typed
+generated output is a defect a regeneration reintroduces, so fix the generator's
+output again after every regeneration. The typed
 rule set skips every `src/data/*.ts` except `types.ts`, because that one is the
 hand-maintained domain model, and only the import-boundary rules (static and
 dynamic) and the clock rule run over the rest (`eslint.config.js`). Seed data is
@@ -325,8 +317,8 @@ coverage is edited (`src/domain/assignment/day.ts`). A value that gains an edit 
 `SEED_OWNED` and in this table.
 
 **No screen writes into `src/data/`.** Anything a screen changes goes in a
-`createStore` store (`src/shared/lib/store.ts`) with a `reset` added to
-`tests/setup.ts`, and nothing under `src/` writes into the seed any more.
+`createStore` store (`src/shared/lib/store.ts`), and nothing under `src/` writes
+into the seed any more.
 `tests/repo/seed.test.ts` parses every non-test module under `src/` and fails on
 an assignment, `delete`, `++`, mutating method or `Object.assign` into anything
 imported from `@/data/` — including through a `const x = SEED.find(...)` alias.
@@ -423,10 +415,8 @@ locked role keeps its lock and cannot be removed.
 in as a lead and fails on any dollar figure on any route or tab. A new money
 element that forgets the check fails there.
 
-**Logic a test should reach goes in a `.ts` beside its page**
-(`src/features/**/*.ts`), with its test beside it as `<module>.test.ts`, which
-`vitest.config.ts` covers; a `.tsx` is not reachable by any test here.
-`src/features/production/orders/fromMail.ts` and
+**Logic goes in a `.ts` beside its page** (`src/features/**/*.ts`); a `.tsx`
+only renders. `src/features/production/orders/fromMail.ts` and
 `src/features/insight/reports/money/money.ts` are the pattern.
 
 Three smaller rules hold across screens: every time on screen carries its zone
@@ -488,18 +478,14 @@ A module imports only from its own layer or the ones below it.
 - Hooks live in `src/shared/hooks/` even when they return UI (`useNotBuilt`,
   `useBudgetHelp`); `shared/{hooks,ui,editors}` are one layer and may import
   each other.
-- Tests (`*.test.ts`, beside the module they cover) are exempt. A test is named
-  for that module, `<module>.test.ts` or `<module>.<topic>.test.ts`
-  (`orders/orderCounts.test.ts`, `leads/leads.book.test.ts`), and
-  `tests/repo/paths.test.ts` fails on one with no such module beside it. They are
-  type-checked as strictly as the app (`tsconfig.test.json`, like
-  `tsconfig.app.json` and `tsconfig.node.json` for the server, carries
-  `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`); a test that needs
-  a row to exist takes it through `must()` or `one()` in `tests/must.ts`, which
-  fail with what was missing rather than a `!`.
+- The only tests are the repository rules in `tests/repo` (comments and
+  documents, seed writes, path collisions, date formatting); there are no unit
+  tests of features or domain logic, and `tests/repo/paths.test.ts` fails on a
+  `*.test.ts` anywhere else. They are type-checked as strictly as the app
+  (`tsconfig.test.json`).
 - A component file stays under 400 lines and a hand-written `.ts` module under
-  300 (`max-lines` in `eslint.config.js`, blank lines not counted; tests and
-  `src/data` are exempt). A longer screen splits by section into files beside
+  300 (`max-lines` in `eslint.config.js`, blank lines not counted; `src/data` is
+  exempt). A longer screen splits by section into files beside
   it; a longer module splits by concept — the engine into `day.ts` (the
   synthetic day), `narrow.ts` (one stage's pool and why it emptied), `engine.ts`
   (the run and the board) and `workload.ts` (who and which department has what);

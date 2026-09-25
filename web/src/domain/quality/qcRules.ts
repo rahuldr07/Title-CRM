@@ -16,5 +16,3 @@ export function setQcRule(actor: Actor, key: string, on: boolean): string | null
   store.update((rules) => rules.map((r) => (r.k === key ? { ...r, on } : r)))
   return null
 }
-
-export const resetQcRules = store.reset

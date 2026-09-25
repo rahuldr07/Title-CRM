@@ -8,13 +8,13 @@ const BOM = '\u{FEFF}'
 const FORMULA = /^[=+\-@\t\r]/
 const PLAIN_NUMBER = /^-?\d+(?:,\d{3})*(?:\.\d+)?$/
 
-export function inert(v: string | number | null | undefined): string {
+function inert(v: string | number | null | undefined): string {
   if (v === null || v === undefined) return ''
   if (typeof v === 'number') return String(v)
   return FORMULA.test(v) && !PLAIN_NUMBER.test(v) ? `'${v}` : v
 }
 
-export function toCSV(rows: CsvRow[]): string {
+function toCSV(rows: CsvRow[]): string {
   const q = (v: string | number | null | undefined) => {
     const t = inert(v)
     return /[",\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t

@@ -118,8 +118,6 @@ export function orderById(id: string): Order | undefined {
   return arrival ? arrivalAsOrder(arrival, slaHours(arrival)) : undefined
 }
 
-export const arrivalOrder = (a: Arrival): EditedOrder => orderAsEdited(arrivalAsOrder(a, slaHours(a)))
-
 export function nextOrderId(): string {
   const top = Math.max(0, ...allOrders().map((o) => Number(o.id.split('-')[0]) || 0))
   return `${top + 1}-1`
@@ -265,9 +263,3 @@ export const ratingAverage = (r: StageRating): number =>
   QC_CRITERIA.reduce((a, [, f]) => a + (r.scores[f] ?? 0), 0) / QC_CRITERIA.length
 
 export const ratingsOf = (id: string): Record<string, StoredRating> => workingOn(id).ratings ?? {}
-
-export function resetOrders(): void {
-  store.reset()
-  created.reset()
-  intakeHeld.reset()
-}

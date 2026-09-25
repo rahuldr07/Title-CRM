@@ -21,5 +21,3 @@ export function useReportExport(make: () => ReportCsv): void {
 }
 
 export const useReportExporter = (): (() => ReportCsv) | null => useStore(store)
-
-export const resetReportExport = store.reset

@@ -55,5 +55,3 @@ const SEED: CompanyState = {
 export const companyStore = createStore<CompanyState>(SEED)
 
 export const keyOf = (n: string): string => n.toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 20) || 'perm'
-
-export const resetCompany = companyStore.reset

@@ -20,5 +20,3 @@ export function postUpdate(who: string, kind: Update['kind'], body: string): Upd
   store.update((prev) => [entry, ...prev])
   return entry
 }
-
-export const resetUpdates = store.reset
