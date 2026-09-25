@@ -1,13 +1,13 @@
 * text=auto eol=lf
 
-src/data/business.ts linguist-generated
-src/data/catalog.ts  linguist-generated
-src/data/hrms.ts     linguist-generated
-src/data/org.ts      linguist-generated
-src/data/people.ts   linguist-generated
-src/data/deliveries.json linguist-generated
-src/data/production.ts linguist-generated
-src/data/quality-log.json linguist-generated
+web/src/data/business.ts linguist-generated
+web/src/data/catalog.ts  linguist-generated
+web/src/data/hrms.ts     linguist-generated
+web/src/data/org.ts      linguist-generated
+web/src/data/people.ts   linguist-generated
+web/src/data/deliveries.json linguist-generated
+web/src/data/production.ts linguist-generated
+web/src/data/quality-log.json linguist-generated
 
 *.png binary
 *.zip binary
