@@ -31,7 +31,7 @@ touching anything under `web/`.
 
 # Frontend roadmap
 
-Agreed 25 Sep 2026, not started. The team tracks status in a spreadsheet (Title-CRM-Frontend-Tasks.xlsx, one row per ID below); this section is the same plan for an agent. Work is `web/` only: the backend is Python FastAPI, built separately, and its `/openapi.json` is the API contract.
+Planned 25 Sep 2026, not started; start a task only when asked. The team tracks status in a spreadsheet (Title-CRM-Frontend-Tasks.xlsx, one row per ID below); this section is the same plan for an agent. Work is `web/` only: the backend is Python FastAPI, built separately, and its `/openapi.json` is the API contract.
 
 ## Decisions
 
