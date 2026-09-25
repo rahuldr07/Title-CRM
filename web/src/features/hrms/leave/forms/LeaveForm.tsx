@@ -36,10 +36,12 @@ function NoteBanner({ note }: { note: Note }) {
 
 export function LeaveForm({
   personId,
+  startOn,
   onSent,
   onCancel,
 }: {
   personId: string
+  startOn?: string
   onSent: (message: string) => void
   onCancel: () => void
 }) {
@@ -52,8 +54,9 @@ export function LeaveForm({
 
   const [type, setType] = useState(types[0]?.k ?? 'pl')
   const [days, setDays] = useState(1)
-  const [from, setFrom] = useState(() =>
-    iso(new Date(today.getFullYear(), today.getMonth(), today.getDate() + policy.noticeDays)),
+  const [from, setFrom] = useState(
+    () =>
+      startOn ?? iso(new Date(today.getFullYear(), today.getMonth(), today.getDate() + policy.noticeDays)),
   )
   const [reason, setReason] = useState('')
   const [cover, setCover] = useState('')

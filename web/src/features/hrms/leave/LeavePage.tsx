@@ -177,6 +177,9 @@ function LeaveScreen() {
         actions={
           <>
             {subSwitch}
+            <Btn variant="ghost" onClick={() => navigate({ to: '/leave/calendar' })}>
+              Leave calendar
+            </Btn>
             <Btn onClick={apply}>Apply for leave</Btn>
           </>
         }

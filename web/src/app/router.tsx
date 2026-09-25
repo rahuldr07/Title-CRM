@@ -88,6 +88,13 @@ const routeTree = rootRoute.addChildren([
 
   screen('/attend', () => import('@/features/hrms/attendance/AttendancePage')),
   screen('/leave', () => import('@/features/hrms/leave/LeavePage')),
+  createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/leave/calendar',
+    validateSearch: (s: Record<string, unknown>): { d?: string } =>
+      typeof s.d === 'string' ? { d: s.d } : {},
+    component: lazyRouteComponent(() => import('@/features/hrms/leave/LeaveCalendarPage')),
+  }),
   screen('/payroll', () => import('@/features/hrms/payroll/PayrollPage')),
   createRoute({
     getParentRoute: () => rootRoute,

@@ -1429,3 +1429,176 @@ body.dark .stepn .sn.now {
 .pair > * {
   min-width: 0;
 }
+
+.lcal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 20px;
+  align-items: start;
+}
+.lcal-side {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  align-content: start;
+}
+.lcal-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.lcal-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lcal-key {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-left: auto;
+  font-size: var(--t-label);
+}
+.lcal-key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.lcal-key i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.lcal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--hair);
+  border: 1px solid var(--hair);
+  border-radius: 11px;
+  overflow: hidden;
+}
+.lcal-wd {
+  background: var(--tint);
+  padding: 9px 10px;
+  font-size: var(--t-eyebrow);
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.lcal-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 92px;
+  padding: 8px 9px;
+  border: 0;
+  background: var(--card);
+  text-align: left;
+  cursor: pointer;
+}
+.lcal-day:hover {
+  background: var(--tint);
+}
+.lcal-day.wk {
+  background: var(--tint2);
+}
+.lcal-day.out .lcal-n {
+  opacity: 0.45;
+}
+.lcal-day.on {
+  box-shadow: inset 0 0 0 2px var(--brand);
+  background: var(--brandsoft);
+}
+.lcal-day:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+.lcal-n {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: var(--t-small);
+  font-weight: 600;
+}
+.lcal-today {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+.lcal-hol {
+  font-size: var(--t-micro);
+  line-height: 1.25;
+  padding: 2px 6px;
+  border-radius: 99px;
+  background: var(--flag);
+  border: 1px solid var(--flagline);
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lcal-dots {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+.lcal-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.lcal-chip {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--t-micro);
+  font-weight: 600;
+  line-height: 1.3;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: var(--tint2);
+  overflow-wrap: anywhere;
+}
+.lcal-holiday {
+  background: var(--flag);
+  border-radius: 9px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.lcal-hint {
+  background: var(--brandsoft);
+  border-radius: 9px;
+  padding: 11px 13px;
+  margin-top: 12px;
+}
+.lcal .rows.bare .rw {
+  padding-left: 0;
+  padding-right: 0;
+}
+@media (max-width: 1080px) {
+  .lcal {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 560px) {
+  .lcal-day {
+    min-height: 66px;
+    padding: 6px 5px;
+  }
+  .lcal-chip,
+  .lcal-hol {
+    display: none;
+  }
+  .lcal-wd {
+    padding: 7px 5px;
+  }
+}
