@@ -1,13 +1,26 @@
-import { useGo } from '@/lib/nav'
-import { useSession } from '@/state/session'
-import { fmtTime, initials, LOCAL_OFFSET_H, TZ, TZ2 } from '@/lib/format'
-import { now } from '@/lib/clock'
-import { DEMO_IDENTITY } from '@/lib/demo'
-import { ROUTE_LABEL } from './nav'
-import { useNotifications } from '@/components/Notifications'
+import type { RefObject } from 'react'
+import { useGo } from '@/shared/hooks/useGo'
+import { useSession } from '@/domain/auth/SessionProvider'
+import { fmtTime, initials, toIst, TZ, TZ2 } from '@/shared/lib/format'
+import { now } from '@/shared/lib/clock'
+import { DEMO_IDENTITY } from '@/shared/lib/demo'
+import { ROUTE_LABEL } from '@/shared/lib/navMenu'
+import { useNotifications } from './useNotifications'
+import { SIDENAV_ID, type Drawer } from './drawer'
+import { Btn, IconButton } from '@/shared/ui/Button'
 
-export function TopBar({ current }: { current: string }) {
-  const { me, tenant, theme, toggleTheme, navOpen, setNavOpen, roleLabel, can } = useSession()
+export function TopBar({
+  current,
+  drawer,
+  burger,
+  onToggle,
+}: {
+  current: string
+  drawer: Drawer
+  burger: RefObject<HTMLButtonElement | null>
+  onToggle: () => void
+}) {
+  const { me, tenant, theme, toggleTheme, roleLabel, can } = useSession()
   const navigate = useGo()
   const { list, open: openAlerts } = useNotifications()
 
@@ -22,29 +35,31 @@ export function TopBar({ current }: { current: string }) {
 
   return (
     <header className="top">
-      <button
+      <IconButton
         className="ic burger"
-        type="button"
-        aria-label="Open navigation"
-        aria-expanded={navOpen}
-        onClick={() => setNavOpen(!navOpen)}
+        ref={burger}
+        label={drawer.burgerLabel}
+        aria-expanded={drawer.open}
+        aria-controls={SIDENAV_ID}
+        onClick={onToggle}
       >
         ☰
-      </button>
+      </IconButton>
 
       {atTarget ? null : (
-        <button
-          className="btn g sm backbtn"
-          type="button"
+        <Btn
+          variant="ghost"
+          small
+          className="backbtn"
           aria-label={`Back to ${targetLabel}`}
           title={`Back to ${targetLabel}`}
           onClick={() => navigate({ to: target })}
         >
           ←<span className="lbl">{hasDash ? 'Dashboard' : 'My work'}</span>
-        </button>
+        </Btn>
       )}
 
-      <span className="gr crumb" style={{ fontSize: 'var(--t-small)' }}>
+      <span className="gr crumb" style={{ fontSize: 'var(--t-small)' }} title={crumb}>
         {crumb}
       </span>
 
@@ -53,56 +68,43 @@ export function TopBar({ current }: { current: string }) {
           {fmtTime(now())} {TZ}
         </b>{' '}
         <span>
-          · {fmtTime(new Date(now().getTime() + LOCAL_OFFSET_H * 3600000))} {TZ2}
+          · {fmtTime(toIst(now()))} {TZ2}
         </span>
       </div>
 
-      <button
+      <IconButton
         className="ic"
-        type="button"
-        aria-label={
+        label={
           list.length ? `Notifications — ${list.length} need attention` : 'Notifications — nothing outstanding'
         }
         onClick={openAlerts}
       >
         🔔
         {list.length ? <span className="dot" style={{ background: worst }} /> : null}
-      </button>
+      </IconButton>
 
-      <button
+      <IconButton
         className="ic"
-        type="button"
-        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
         aria-pressed={theme === 'dark'}
         onClick={toggleTheme}
       >
         ◐
-      </button>
+      </IconButton>
 
-      <button
+      <IconButton
         className="who"
-        type="button"
-        aria-label={DEMO_IDENTITY ? 'Account — switch who you are signed in as' : 'Account'}
+        label={DEMO_IDENTITY ? 'Account — switch who you are signed in as' : 'Account'}
         onClick={() => navigate({ to: '/signin' })}
       >
         <span className="ava" style={{ width: 26, height: 26, fontSize: 'var(--t-mini)' }}>
           {initials(me.n)}
         </span>
-        <span
-          style={{
-            textAlign: 'left',
-            lineHeight: 1.3,
-            display: 'flex',
-            flexDirection: 'column',
-            minWidth: 0,
-          }}
-        >
-          <b style={{ fontSize: 'var(--t-small)', whiteSpace: 'nowrap' }}>{me.n}</b>
-          <span className="gr" style={{ fontSize: 'var(--t-eyebrow)', whiteSpace: 'nowrap' }}>
-            {roleLabel}
-          </span>
+        <span className="who-id">
+          <b>{me.n}</b>
+          <span className="gr">{roleLabel}</span>
         </span>
-      </button>
+      </IconButton>
     </header>
   )
 }

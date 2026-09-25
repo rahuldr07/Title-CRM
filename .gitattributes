@@ -1,10 +1,5 @@
-# Normalise line endings in the repository, and check out whatever the platform
-# uses. Without this, every commit from Windows warns about LF being replaced.
 * text=auto eol=lf
 
-# Seed data transcribed from the Claude Design export by script. It ships in the
-# build, so it is not vendored — but a 480KB diff of delivery records is noise in
-# a review, and none of it is hand-edited.
 src/data/business.ts linguist-generated
 src/data/catalog.ts  linguist-generated
 src/data/hrms.ts     linguist-generated
@@ -14,6 +9,5 @@ src/data/deliveries.json linguist-generated
 src/data/production.ts linguist-generated
 src/data/quality-log.json linguist-generated
 
-# Binary-ish artefacts that should never be diffed as text.
 *.png binary
 *.zip binary

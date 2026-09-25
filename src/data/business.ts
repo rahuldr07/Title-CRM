@@ -547,4 +547,3 @@ export const LEADS: Lead[] = [
 export const STALE_WARN: number = 14
 
 export const STALE_BAD: number = 30
-

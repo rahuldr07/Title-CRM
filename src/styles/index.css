@@ -1,41 +1,9 @@
 @import 'tailwindcss';
 
-/*
- * The design's own stylesheet is imported AFTER Tailwind so its component rules
- * (unlayered) always win over Tailwind's `utilities` layer. Tailwind supplies the
- * token scale and one-off utilities; design.css supplies the visual contract.
- */
 @import './design.css';
 
-/* The design toggles dark mode with `body.dark`, not the OS preference. */
 @custom-variant dark (&:where(body.dark, body.dark *));
 
-/*
- * ─────────────────────────────────────────────────────────────────────────
- * Typography
- * ─────────────────────────────────────────────────────────────────────────
- *
- * The design shipped Inter and IBM Plex Mono off the Google Fonts CDN, at 13
- * distinct sizes that accumulated rather than scaled, with slate-500 doing duty
- * for both "secondary" and "this is a heading". All three are changed here, and
- * all three are changed *here* rather than in design.css, which stays a verbatim
- * port so it can still be diffed against the export (CLAUDE.md, invariant 2).
- *
- * The cost of that choice is this file: 80 of design.css's typographic rules are
- * restated below. They are grouped by scale step rather than by component, so
- * the scale is legible as a scale — which is the thing design.css cannot show.
- */
-
-/*
- * Geist and Geist Mono, vendored from the `geist` npm package (v1.5.1, OFL —
- * see ./fonts/LICENSE.txt) rather than fetched. Self-hosting drops a
- * third-party connection from first paint, lets the app run offline, and puts
- * the files through Vite so they land in /assets/ with hashed names — the only
- * path vercel.json grants `immutable` caching.
- *
- * Both are variable across 100-900, which is why design.css's `font-weight: 650`
- * on #mdt now renders at 650 instead of being rounded to the nearest static cut.
- */
 @font-face {
   font-family: 'Geist';
   src: url('./fonts/Geist-Variable.woff2') format('woff2');
@@ -51,18 +19,6 @@
   font-display: swap;
 }
 
-/*
- * Metric-matched fallbacks, and the reason there is no `<link rel=preload>`.
- *
- * `font-display: swap` means text paints in the fallback first, so whatever the
- * fallback measures differently — line height, character width — moves when the
- * real face arrives. Preloading only shortens that window; overriding the
- * fallback's metrics closes it. The numbers are Geist's own, read out of the
- * head/hhea/OS-2 tables of the shipped .ttf and divided through by the size
- * adjustment: Geist is 1000 upem, ascent 1005, descent -295, no line gap, and
- * average character width 581 against Arial's 0.5562em and Courier New's
- * 0.6001em.
- */
 @font-face {
   font-family: 'Geist Fallback';
   src: local('Arial'), local('Helvetica');
@@ -84,97 +40,42 @@
   --sans: 'Geist', 'Geist Fallback', system-ui, sans-serif;
   --mono: 'Geist Mono', 'Geist Mono Fallback', ui-monospace, monospace;
 
-  /*
-   * The scale. Ten steps, replacing the design's thirteen unrelated sizes —
-   * 9.5, 10.5, 11, 11.5, 12, 12.5, 13, 13.5, 14.5, 17, 19, 23, 26 — none of
-   * which were more than a pixel from a neighbour at the bottom end, where most
-   * of this app lives.
-   *
-   * Every step is larger than the value it replaces. The lift is deliberate and
-   * biggest at the small end: a chip was 11.5px and is 13px, a count 12.5px and
-   * is 13.5px, body 13.5px and is 14.5px. Geist sets a little narrower than
-   * Inter at matched size, so the density this app depends on survives it.
-   *
-   * --t-micro exists only for inline styles: four of them asked for 8.5px,
-   * which is below anything design.css names and too small to read.
-   */
-  --t-micro: 10.5px; /* was 8.5 */
-  --t-mini: 11px; /* was 9.5  — nav labels, badges, avatars */
-  --t-eyebrow: 12px; /* was 10.5 — section eyebrows, table heads */
-  --t-label: 13px; /* was 11 / 11.5 / 12 — chips, field labels, row subtitles */
-  --t-small: 13.5px; /* was 12.5 — counts, key/value terms, mono cells */
-  --t-body: 14.5px; /* was 13 / 13.5 — body, cell values, buttons, inputs */
-  --t-lead: 16px; /* was 14.5 — card headings */
-  --t-h3: 18.5px; /* was 17 — modal and section titles */
-  --t-h2: 20.5px; /* was 19 */
-  --t-h1: 25px; /* was 23 — page title */
-  --t-display: 28px; /* was 26 — KPI figures */
+  --t-mini: 11px;
+  --t-eyebrow: 12px;
+  --t-label: 13px;
+  --t-small: 13.5px;
+  --t-body: 14.5px;
+  --t-lead: 16px;
+  --t-h3: 18.5px;
+  --t-h2: 20.5px;
+  --t-h1: 25px;
+  --t-display: 28px;
 
-  /*
-   * No grey text, anywhere.
-   *
-   * design.css spends `--gr` on two unrelated jobs — text that recedes (a
-   * hint, a timestamp, an empty state) and text that labels something else (a
-   * section eyebrow, a column head, a field name) — and an earlier revision of
-   * this file split that into two tones, `--gr` and `--gr2`, rather than
-   * settle which reading was wanted. Told plainly that neither was: nothing on
-   * screen renders in grey. Both tokens alias to `--ink` here, so every rule in
-   * design.css and every component call site naming `--gr` or `--gr2` — the
-   * `.gr` utility alone is ~465 of them — prints in the same ink as primary
-   * text, in both themes, because `--ink` already flips between them.
-   *
-   * The tokens stay defined rather than deleted: design.css cannot be edited
-   * (invariant 2), so deleting them would leave `var(--gr)` there pointing at
-   * nothing, and a browser drops a declaration with an unresolvable custom
-   * property silently rather than erroring.
-   */
   --gr2: var(--ink);
   --gr: var(--ink);
 
-  /*
-   * The sidebar rail has its own grey, `--navtx`, for the same reason: nav
-   * labels, the tenant's plan line and the sign-out row all rendered lighter
-   * than the active item's white. Aliased to `--navon` — the rail's own
-   * "this is emphatic" white — so nothing there recedes either. `--navon`
-   * does not change under `body.dark` (the rail stays the same dark navy in
-   * both app themes), so one alias covers both.
-   */
   --navtx: var(--navon);
 }
 
 body.dark {
-  /* design.css redeclares `--gr`, `--gr2` and `--navtx` under `body.dark`
-     with different literals (invariant 2 again), which would win back over
-     the `:root` aliases above on specificity. Redeclaring the aliases here,
-     later in the cascade, keeps dark mode grey-free too. */
+
   --gr2: var(--ink);
   --gr: var(--ink);
   --navtx: var(--navon);
 }
 
-/*
- * Two greys design.css never routed through a token at all: `.navlbl` (the
- * PRODUCTION / BUSINESS / HRMS section labels in the rail) and the hover
- * state on an inactive nav item are literal hex, not `var(--navtx)`. Restated
- * here at the same selector and specificity so the later rule wins.
- */
 .navlbl,
 .side nav button:hover,
 .side nav a:hover {
   color: var(--navon);
 }
 
-/* The faces. design.css names Inter in three places — `body`, the `--mono`
-   token, and a hardcoded `font-family: Inter` on `.due .sub`. The token is
-   redefined above; the other two are restated here. */
 body {
   font-family: var(--sans);
 }
 .due .sub {
   font-family: var(--sans);
 }
-
-/* ── The scale, applied. Grouped by step, in the order of the scale above. ── */
 
 .navlbl,
 .ava,
@@ -215,6 +116,12 @@ h2.sec,
 .tl-e > .tl-when,
 .legend {
   font-size: var(--t-label);
+}
+
+.inp[readonly] {
+  background: var(--tint2);
+  border-style: dashed;
+  cursor: default;
 }
 
 .logo i,
@@ -289,21 +196,6 @@ h1.pg {
   font-size: var(--t-display);
 }
 
-/*
- * No per-selector override needed for the labels that used to read `--gr2`
- * (section eyebrows, column heads, field labels, page subtitles, k/v terms):
- * design.css already sets `color: var(--gr)` directly on every one of them,
- * and `--gr` is `--ink` now. The alias above is the whole fix.
- */
-
-/*
- * Additions that are not in the design sheet, kept here so design.css stays a
- * faithful copy of it.
- *
- * The top bar is one non-wrapping row. It already ran past the edge of a phone
- * before the back control was added, so the two things that can give way do:
- * the crumb truncates, and the back control drops to its arrow.
- */
 .top .crumb {
   min-width: 0;
   overflow: hidden;
@@ -311,11 +203,6 @@ h1.pg {
   white-space: nowrap;
 }
 
-/*
- * The signed-out shell. No sidebar and no top bar; the sign-in page is the only
- * thing that stands in it, and it is a full-bleed split screen, so the shell
- * gives it the whole viewport rather than the app's padded 1360px column.
- */
 .authshell {
   min-height: 100vh;
   background: var(--bg);
@@ -324,18 +211,7 @@ h1.pg {
   max-width: none;
   padding: 0;
 }
-/*
- * The sign-in page: the company's story on the left, the form on the right.
- * design.css has no page like it, so all of this is addition. Its colours are
- * scoped tokens on .si — the company's teal is not the app's indigo — with a
- * dark set below, and the street along the bottom is an SVG that reads them.
- * Text keeps to ink under the no-grey-text rule; the hierarchy is size and
- * weight. Below 980px the story panel goes and the form stands alone.
- *
- * .so is the other end of the same visit — the card /signin shows while you
- * are still signed in, which is where both sign-out controls lead — so it
- * takes the same tokens, the same street, and the same teal button.
- */
+
 .si,
 .so {
   --si-teal: #136b8a;
@@ -486,10 +362,7 @@ body.dark .so {
 .si-card-mark {
   text-align: center;
 }
-/* The logo is a flat image on white: multiplied, the white takes the page's
-   tint on a light ground; on a dark one it keeps a plate of its own. The blend
-   sits on the crop box, not the image inside it — the box's transform makes it
-   a stacking context, and an image blending inside one blends with nothing. */
+
 .si .si-logo,
 .so .si-logo {
   display: inline-block;
@@ -508,8 +381,7 @@ body.dark .so {
   object-fit: cover;
   object-position: 50% 46%;
 }
-/* The mark starts 11% into its own file; pull it back to the text edge. On
-   a dark ground the whole plate shows, so the plate's edge is the one to align. */
+
 .si-hero-in .si-logo-crop {
   transform: translateX(-11%);
 }
@@ -792,13 +664,6 @@ body.dark .si-hero-in .si-logo-crop {
   }
 }
 
-/*
- * The filter bar is one row of controls with the search and selects pushed
- * right. That group could not wrap, so a screen with four selects ran ~919px
- * wide and took the whole page into horizontal scroll on a phone. It wraps now,
- * and below the drawer breakpoint it stops being a right-aligned group at all:
- * full width, each control free to shrink to something still usable.
- */
 .fbar .sp {
   flex-wrap: wrap;
   min-width: 0;
@@ -817,24 +682,12 @@ body.dark .si-hero-in .si-logo-crop {
   .fbar .sp {
     gap: 7px;
   }
-  /* One per row below this: two 150px controls plus a gap no longer fit. */
+
   .fbar .inp {
     flex: 1 1 100%;
   }
 }
 
-/*
- * Orders' filter row, opted in via `.fbar.wide`.
- *
- * Six controls — four selects, a date and search — do not fit beside the
- * pills. Spread across a line of their own with space-between, the selects
- * sat far apart and search wrapped alone onto a third line at its natural
- * width, too narrow for its own placeholder. Search now rides on the pills'
- * line, as the design has it, taking the room to their right; the selects and
- * the date take the next line together, left-aligned at the bar's own gap.
- * Scoped above the drawer breakpoint — below it, `.fbar .sp` and `.fbar .inp`
- * above already stack the controls full width.
- */
 @media (min-width: 821px) {
   .fbar.wide .fsearch {
     flex: 0 1 360px;
@@ -848,19 +701,36 @@ body.dark .si-hero-in .si-logo-crop {
   }
 }
 
-/*
- * The mobile menu button. `.top .ic` sets display:grid at (0,2,0) and beat
- * `.burger { display: none }` at (0,1,0), so the hamburger sat in the top bar
- * on desktop beside an already-visible sidebar. Matching the specificity is the
- * fix; the design's own !important rule still wins below 820px.
- */
 .top .ic.burger {
   display: none;
+}
+.top .ic,
+.top .who,
+.top .backbtn {
+  flex: none;
+}
+.who-id {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  text-align: left;
+  line-height: 1.3;
+}
+.who-id b {
+  font-size: var(--t-small);
+  white-space: nowrap;
+}
+.who-id span {
+  font-size: var(--t-eyebrow);
+  white-space: nowrap;
 }
 .backbtn .lbl {
   margin-left: 6px;
 }
 @media (max-width: 820px) {
+  .top {
+    padding: 0 16px;
+  }
   .top .clock {
     display: none;
   }
@@ -869,115 +739,163 @@ body.dark .si-hero-in .si-logo-crop {
   }
 }
 
-/*
- * The mask sits fixed over the page rather than replacing it, so without this
- * the page underneath keeps its own scroll — one scrollbar for the modal's
- * content, another for the page behind it. `UiProvider` toggles the class.
- */
 body.modalopen {
   overflow: hidden;
 }
 
-/*
- * A KPI tile may not widen its own grid track.
- *
- * `.kpis` asks for `minmax(168px, 1fr)`, but a grid item's automatic minimum is
- * its content, so one long unbreakable figure — $126,194.60 in 26px mono on the
- * invoicing screen — pushes the track past 168px and the row past the viewport.
- * Every other screen's figures are short enough that it never showed. Letting the
- * tile shrink, and the figure wrap rather than dictate, keeps the row inside the
- * phone without touching the sizes anywhere it already fitted.
- */
+.modal:focus {
+  outline: none;
+}
+
 .kpi {
   min-width: 0;
   container-type: inline-size;
 }
-/* Letting the figure wrap "anywhere" kept the row inside the phone but broke
- * numbers in half — "$126,194 / .60", "₹8,76,00 / 6". A figure stays on one line
- * and scales with its tile instead: 13cqi of the tile's width, capped at the type
- * step, which leaves every desktop tile at its full size. `Kpi` applies the same
- * cap to a `valueSize` given inline. */
+
 .kpi .v {
   white-space: nowrap;
   font-size: min(var(--t-display), 13cqi);
 }
 
-/*
- * A row whose first slot holds a chip rather than a glyph.
- *
- * `.rw` sets that column to a fixed 22px, which is exactly one icon wide. A chip
- * put there — a leave type, a link status, a standing — is 85 to 100px, so it
- * overran the column and printed on top of the description beside it. Three
- * screens did this and all three overlapped by 20 to 100 pixels.
- *
- * Sizing the column to its content fixes the class rather than the three cases,
- * and leaves every ordinary icon row exactly as it was.
- */
 .rw.tagged {
   grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
-/*
- * The tab bar scrolls sideways rather than wrapping, with the scrollbar hidden.
- * That was fine for the five-tab screens the export shipped; on the eight-tab
- * ones — an order, and Company — the last tab is cut in half with nothing on
- * screen to say it is there or how to reach it.
- *
- * Wrapping keeps every tab reachable and changes nothing at widths where they
- * already fit. The row keeps its underline by letting each line carry it.
- */
+.barrow {
+  display: grid;
+  grid-template-columns: var(--barrow-cols);
+  gap: var(--barrow-gap);
+  align-items: center;
+  font-size: var(--t-small);
+}
+
+.cnt {
+  flex-wrap: wrap;
+}
+.cnt > * {
+  min-width: 0;
+}
+
+.me .lo {
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  min-height: 24px;
+}
+
+.mat td > button,
+button.lnk {
+  display: inline-flex;
+  align-items: center;
+  min-width: 24px;
+  min-height: 24px;
+}
+
+.cell .s:has(> a) {
+  margin-top: 4px;
+}
+.cell .s > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+
+.covrow {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hair);
+}
+.covrow-st {
+  width: 126px;
+  flex: none;
+  padding-top: 4px;
+}
+.covrow-cos {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.covrow-n {
+  width: 76px;
+  flex: none;
+  padding-top: 4px;
+  text-align: right;
+  font-size: var(--t-label);
+}
+
+@media (max-width: 560px) {
+  .top {
+    gap: 8px;
+  }
+  .chip {
+    white-space: normal;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+  .rw.tagged {
+    grid-template-columns: fit-content(45%) minmax(0, 1fr);
+    row-gap: 8px;
+  }
+  .rw.tagged > :nth-child(3) {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .rw.tagged > :nth-child(3):empty {
+    display: none;
+  }
+  .rw.tagged:has(> :first-child > .chip) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rw.tagged:has(> :first-child > .chip) > * {
+    grid-column: 1;
+  }
+  .barrow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    row-gap: 5px;
+  }
+  .barrow > :first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .barrow > :last-child {
+    min-width: 0;
+    margin-left: auto;
+  }
+  .barrow > :nth-child(2) {
+    order: 3;
+    flex: 1 0 100%;
+  }
+  .covrow {
+    flex-wrap: wrap;
+  }
+  .covrow-st {
+    flex: 1 1 auto;
+    width: auto;
+  }
+  .covrow-cos {
+    order: 3;
+    flex-basis: 100%;
+  }
+}
+
 .tabs {
   flex-wrap: wrap;
   overflow-x: visible;
 }
 
-/*
- * The page header's action row, when there is no room for it on one line.
- *
- * `.hd` already wraps, so a long title pushes the actions onto their own line.
- * What it cannot do is help once they are there: `.hd .r` is `flex: none` and
- * does not wrap, so a row of two filters and two buttons stays one unbroken
- * 564px line inside a 550px column. It does not clip — it reaches 14px past the
- * right edge every other block on the page lines up on, and sits in the page
- * padding. Orders at tablet width is the case that shows it.
- *
- * Capping the width at the container and letting the contents wrap fixes it
- * where it happens and changes nothing where the row already fits. The design
- * does the same thing itself below 560px; this only stops it being the one
- * width where the rule is missing.
- */
 .hd .r {
   flex-wrap: wrap;
   max-width: 100%;
 }
 
-/*
- * Scrollbars.
- *
- * The app scrolls in five places — the page, a table wider than its card, a
- * modal taller than 88vh, the sidebar's nav list, and a strip of cards wider
- * than its row — and each of them draws the operating system's own bar. In dark
- * mode that is a pale slab down the side of a #0b1120 page.
- *
- * One thumb everywhere instead, taken from the muted text colour of the ground
- * it sits on, over a transparent track that lets that ground through. The app's
- * ground turns over with the theme and `--gr` turns with it. The sidebar's rail
- * does not — `--nav` is near-black under both themes — so its list is stated
- * separately, against `--navtx`.
- *
- * Two mechanisms, because an engine honours one of them and drops the other
- * outright: the standard properties, and the WebKit pseudo-elements. Both are
- * declared, held to one width and one pair of colours, so which one wins does
- * not show. `scrollbar-color` is the only one of the three that inherits, so the
- * width and the pseudo-elements are matched on every element rather than set
- * once; and all of it hangs off `body` rather than the root, because the theme
- * redefines its tokens on `body.dark` and the viewport takes the body's
- * scrollbar when the root declares none of its own.
- *
- * Nothing here hides a bar. In every one of those regions the bar is the only
- * thing on screen saying there is more to reach, which is the tab bar's lesson
- * above.
- */
 body,
 body * {
   scrollbar-width: thin;
@@ -1008,7 +926,6 @@ body *::-webkit-scrollbar-thumb:hover {
   background-color: color-mix(in srgb, var(--gr) 70%, transparent);
 }
 
-/* The nav list stands on the rail, so it takes the rail's own foreground. */
 .side nav {
   scrollbar-color: color-mix(in srgb, var(--navtx) 40%, transparent) transparent;
 }
@@ -1019,22 +936,11 @@ body *::-webkit-scrollbar-thumb:hover {
   background-color: color-mix(in srgb, var(--navtx) 65%, transparent);
 }
 
-/*
- * A row of cards wider than the row — the hiring pipeline's stages, the
- * attendance board's departments. Both carried the same inline `overflowX`;
- * naming it puts them on the shared bar and keeps the content off it.
- */
 .xscroll {
   overflow-x: auto;
   padding-bottom: 4px;
 }
 
-/*
- * "Needs you" on My Work — a pill button styled like a labelled switch, not a
- * plain ghost button, so it reads as a status indicator next to "My profile".
- * design.css has no switch of its own to reuse; this is the smallest one that
- * still matches the card language (border, radius, shadow) already in use.
- */
 .needsYou {
   display: inline-flex;
   align-items: center;
@@ -1079,13 +985,6 @@ body *::-webkit-scrollbar-thumb:hover {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.25);
 }
 
-/*
- * The chat behind "Needs you". design.css has no message thread, so these are
- * additions rather than corrections. Your own messages sit right on
- * --brandsoft and the other person's left on --tint2 with a hairline, which
- * keeps both readable in dark mode — --brand with white text does not reach
- * 3:1 there. The thread scrolls inside the modal so the reply box stays put.
- */
 .chat-head {
   display: flex;
   align-items: center;
@@ -1153,40 +1052,14 @@ body *::-webkit-scrollbar-thumb:hover {
   border-radius: 99px;
   background: var(--bad);
   color: #fff;
-  font-size: var(--t-micro);
+  font-size: var(--t-mini);
   font-weight: 700;
 }
 
-/*
- * `.mat`'s header cells carry none of `.mat td`'s padding (design.css). Tailwind's
- * preflight zeroes table-cell padding globally, and design.css only redeclares it
- * for `td` — so every `.mat` table's header row (Invoicing's by-client-and-month
- * grid, Attendance's roster, and the rest built on the same class) rendered as a
- * thin sliver next to its own 9px/11px body rows. Giving `th` a taller padding
- * than the data rows both fixes the gap and gives the heading its own weight.
- */
 .mat th {
   padding: 12px 11px;
 }
 
-/*
- * Loans' register + payroll-preview section, opted in via `.brkout`.
- * `.wrap` caps every page's content at 1360px (design.css), so this
- * two-column section — a wide table beside a fixed 320px sidebar — sits
- * inside that cap too, wasting whatever the screen has beyond 1592px: 1360
- * plus `.app`'s 232px sidebar column, the only place that width is named
- * (design.css). Below that exact point `.wrap` isn't capped yet — it is
- * already sized to fit — so the override only switches on where the cap
- * actually starts binding; anything looser overflows `.wrap` by the width
- * this rule would otherwise add on top of an already-uncapped page. The
- * 26px matches `.wrap`'s own left padding, so the section's right edge
- * lands on `.main`'s edge instead of stopping 26px short of it.
- *
- * `100vw` measures the window, not the space left of its scrollbar, so
- * without `scrollbar-gutter: stable` below this overshoots by a scrollbar's
- * width and puts a horizontal one on the page — the thing `.fbar`'s own
- * comment above already calls out as the failure mode this file avoids.
- */
 html {
   scrollbar-gutter: stable;
 }
@@ -1197,18 +1070,6 @@ html {
   }
 }
 
-/*
- * Working tables on a phone.
- *
- * Every table sets a minimum width (700 to 980px) and scrolls sideways inside
- * its card, so at 390px My work's queue showed #, Order and Client and hid
- * Stage, Due and Open; the past-due list lost Stage and Due; the exceptions
- * assign control sat off-screen. Below 560px a row becomes a card: the header
- * row goes, the cells flow two to a line, and each cell carries its column's
- * name (`data-label`, set by DataTable and FlexTable) above its value. The
- * `!important`s beat the inline grid templates and minimum widths each table
- * sets on its rows.
- */
 @media (max-width: 560px) {
   .tsc > div {
     min-width: 0 !important;
@@ -1225,7 +1086,7 @@ html {
     content: attr(data-label);
     display: block;
     margin-bottom: 2px;
-    font-size: var(--t-micro);
+    font-size: var(--t-mini);
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -1236,11 +1097,6 @@ html {
   }
 }
 
-/*
- * My work on a phone: the queue first. It is the thing a production seat opens
- * the screen for, and stacked in desktop order it sat two-thirds of the way down,
- * below birthdays and leave. Desktop keeps the design's order.
- */
 @media (max-width: 560px) {
   .mw {
     display: flex;
@@ -1252,12 +1108,6 @@ html {
   }
 }
 
-/*
- * A banner with an action, on a phone. `.bnr` is a flex row with the action
- * pinned right (`.ba`, flex: none), so at 390px the action kept its width and
- * the message was squeezed into a strip a word or two wide — "17 stages could
- * not be placed" ran to twenty lines. The action drops below the message.
- */
 @media (max-width: 560px) {
   .bnr {
     flex-wrap: wrap;
@@ -1272,13 +1122,6 @@ html {
   }
 }
 
-/*
- * Sidebar items are links, so one can be opened in a new tab or its address
- * copied; as buttons, nothing could. design.css styles them as
- * `.side nav button`, which the port keeps, so the same rules are restated for
- * `a` here. Type sizes and the hover colour are restated above, beside the
- * button's own.
- */
 .side nav a {
   display: flex;
   align-items: center;
@@ -1316,13 +1159,6 @@ html {
   font-weight: 700;
 }
 
-/*
- * A table row that does nothing does not look as if it does. design.css gives
- * every `.tb .trow` a pointer and a hover bar, so the invoice register's rows
- * invited a click they had no answer to. A row that acts sets role="button"
- * (DataTable, FlexRow and every hand-built clickable row do), so it alone keeps
- * the pointer and the bar.
- */
 .tb .trow:not([role='button']) {
   cursor: default;
 }
@@ -1331,13 +1167,103 @@ html {
   box-shadow: none;
 }
 
-/*
- * Printing, which is how a payslip becomes a PDF: the browser's print dialog
- * saves any page as one. Without this the sidebar, the top bar and the page's
- * own buttons printed too, and in dark mode light text went onto white paper.
- * The light tokens are restated for `body.dark` so a printout never follows the
- * screen's theme.
- */
+.kpi:not([role='button']) {
+  cursor: default;
+}
+.kpi:not([role='button']):hover {
+  transform: none;
+  box-shadow: var(--sh1);
+}
+.kpi.stat:not([role='button']):hover {
+  box-shadow: none;
+}
+
+body.dark .side nav a .bdg,
+body.dark .side nav button .bdg,
+body.dark .tabs .bdg,
+body.dark .needsYou .bdg,
+body.dark .chat-unread,
+body.dark .skip {
+  color: var(--bg);
+}
+
+.side :focus-visible {
+  outline-color: var(--brand2);
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: rgba(15, 23, 42, 0.42);
+}
+.navclose {
+  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: var(--navon);
+  font-size: var(--t-h2);
+}
+.navclose:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+@media (max-width: 820px) {
+  body.navopen::after {
+    content: none;
+  }
+  .skip:focus {
+    left: 16px;
+  }
+}
+@media (min-width: 821px) {
+  .navclose {
+    display: none;
+  }
+}
+
+.sharerow {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) 92px 78px;
+  grid-template-areas: 'name range pct hrs';
+  gap: 11px;
+  align-items: center;
+  padding: 7px 0;
+}
+.sharerow .sh-n {
+  grid-area: name;
+  font-size: var(--t-small);
+  font-weight: 600;
+}
+.sharerow .sh-r {
+  grid-area: range;
+  min-width: 0;
+  width: 100%;
+}
+.sharerow .sh-p {
+  grid-area: pct;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.sharerow .sh-h {
+  grid-area: hrs;
+  font-size: var(--t-label);
+  text-align: right;
+}
+@media (max-width: 560px) {
+  .sharerow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'name hrs'
+      'range pct';
+    gap: 4px 11px;
+    padding: 9px 0;
+  }
+}
+
 @media print {
   body,
   body.dark {
@@ -1383,21 +1309,10 @@ html {
   }
 }
 
-/*
- * A card in a two-column layout may be narrower than the table inside it.
- * Below its breakpoint `.two` is one `1fr` column, and a grid item's minimum
- * width is its content, so Turnaround's by-client table widened its card to
- * 622px and took the page 248px into sideways scroll on a phone. With the
- * minimum at zero, the table scrolls inside its card as every other one does.
- */
 .two > * {
   min-width: 0;
 }
 
-/* The screen shown while the session asks who is signed in. It used to be an
- * empty div, which on a slow or hung connection read as a broken page. The
- * fade waits 300ms so a fast answer never flashes it; under reduced motion the
- * animation is off and it is simply shown. */
 .boot {
   min-height: 100vh;
   display: grid;
@@ -1413,13 +1328,10 @@ html {
   to { opacity: 1; }
 }
 
-/* Design tokens exposed to Tailwind so utilities resolve to the design's palette. */
 @theme {
   --color-nav: #131a2b;
   --color-nav2: #1b2438;
-  /* Aliased to --ink / --navon rather than the design's own grey, so a
-     Tailwind `text-gr` or `text-navtx` utility — none exist today — could
-     not silently reintroduce grey text. */
+
   --color-navtx: var(--navon);
   --color-bg: #f6f7f9;
   --color-card: #ffffff;
@@ -1441,8 +1353,6 @@ html {
   --color-flag: #fef9ee;
   --color-flagline: #f0d9ae;
 
-  /* Kept in step with `--sans` / `--mono` above, fallbacks included, so a
-     Tailwind `font-sans` utility and a design.css rule resolve to one stack. */
   --font-sans: 'Geist', 'Geist Fallback', system-ui, sans-serif;
   --font-mono: 'Geist Mono', 'Geist Mono Fallback', ui-monospace, monospace;
 
@@ -1451,4 +1361,71 @@ html {
 
   --shadow-sh1: 0 1px 2px rgba(15, 23, 42, 0.05), 0 4px 14px rgba(15, 23, 42, 0.05);
   --shadow-sh2: 0 4px 10px rgba(15, 23, 42, 0.07), 0 18px 44px rgba(15, 23, 42, 0.1);
+}
+
+.asm b {
+  display: inline;
+  margin-bottom: 0;
+  color: inherit;
+}
+.asm b.at {
+  display: block;
+  margin-bottom: 2px;
+  color: #92610a;
+}
+body.dark .asm b.at {
+  color: var(--warn);
+}
+
+.step .sn {
+  background: var(--rail);
+  color: var(--ink);
+}
+.step.done .sn {
+  background: var(--ok);
+  color: #fff;
+}
+.step.now .sn {
+  background: var(--brand);
+  color: #fff;
+}
+body.dark .step.done .sn,
+body.dark .step.now .sn,
+body.dark .stepn .sn.now {
+  color: var(--bg);
+}
+
+.cell .chip {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.tl {
+  display: grid;
+  grid-template-columns: minmax(132px, max-content) minmax(0, 1fr);
+  column-gap: 14px;
+}
+.tl-e {
+  display: contents;
+}
+@media (max-width: 640px) {
+  .tl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ava.none {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 500px), 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.pair > * {
+  min-width: 0;
 }

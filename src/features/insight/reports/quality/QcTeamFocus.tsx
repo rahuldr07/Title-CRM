@@ -1,0 +1,311 @@
+import { useStageName } from '@/domain/company/naming'
+import { Banner } from '@/shared/ui/Banner'
+import { BarGrid, BarRow } from '@/shared/ui/Bar'
+import { Card, Label } from '@/shared/ui/Card'
+import { Chip } from '@/shared/ui/Chip'
+import { Press } from '@/shared/ui/Button'
+import { Rows } from '@/shared/ui/DetailList'
+import { SectionHead } from '@/shared/ui/PageHead'
+import { Cell, FlexRow, FlexTable } from '@/shared/ui/FlexTable'
+import { FocusHead } from '@/features/insight/reports/FocusKpis'
+import { RatingMarks } from '@/shared/ui/RatingsTable'
+import { MarkSpread } from './QcFocus'
+import { hh } from '@/domain/assignment/sla'
+import { fmtDate } from '@/shared/lib/format'
+import { averageText, reasonCounts, type RatedPerson } from '@/domain/quality/quality'
+import type { Delivery } from '@/data/deliveries'
+import type { QcEntry } from '@/data/quality'
+import type { Range } from '@/shared/lib/range'
+import { Note } from '@/shared/ui/Layout'
+
+export function QcTeamFocus({
+  focus,
+  dels,
+  rows,
+  defects,
+  range,
+  people,
+  overall,
+  onBack,
+  onOpenPerson,
+  onOpenRules,
+}: {
+  focus: string
+  dels: Delivery[]
+  rows: QcEntry[]
+  defects: QcEntry[]
+  range: Range
+  people: RatedPerson[]
+  overall: number | null
+  onBack: () => void
+  onOpenPerson: (name: string) => void
+  onOpenRules: () => void
+}) {
+  const stageName = useStageName()
+  const cover = dels.length ? Math.round((rows.length / (dels.length * 2)) * 100) : 0
+
+  const head = (
+    <FocusHead
+      title={
+        focus === 'delivered'
+          ? `The ${dels.length} deliveries behind that number`
+          : focus === 'unrated'
+            ? 'The checks that were never filled in'
+            : focus === 'spread'
+              ? 'Every mark that made up that average'
+              : `All ${defects.length} defect${defects.length === 1 ? '' : 's'} in this range`
+      }
+      onBack={onBack}
+    >
+      {fmtDate(range.from)} to {fmtDate(range.to)}. The rest of the report is hidden while you are looking at
+      this.
+    </FocusHead>
+  )
+
+  if (focus === 'delivered') {
+    const late = dels.filter((x) => x.late)
+    return (
+      <>
+        {head}
+        <SectionHead>
+          Delivered — {dels.length}, of which {late.length} late
+        </SectionHead>
+        <FlexTable
+          cols="40px 110px 150px 150px 110px 110px 130px 1fr"
+          min={940}
+          head={['#', 'Date', 'Order', 'Client', 'Promise', 'Took', 'Outcome', 'Rated']}
+        >
+          {dels
+            .slice()
+            .sort((a, b) => +b.d - +a.d)
+            .map((x, xi) => {
+              const rated = rows.filter((y) => y.order === x.id)
+              return (
+                <FlexRow cols="40px 110px 150px 150px 110px 110px 130px 1fr" key={x.id}>
+                  <Cell v={xi + 1} mono tone="gr" />
+                  <Cell v={fmtDate(x.d)} mono />
+                  <Cell v={x.id} mono s={x.pr} />
+                  <Cell v={x.cl} />
+                  <Cell v={`${x.slaH}h`} mono />
+                  <Cell v={hh(x.hrs)} mono tone={x.late ? 'bad' : 'ok'} />
+                  <Cell>{x.late ? <Chip kind="d">Late</Chip> : <Chip kind="v">On time</Chip>}</Cell>
+                  <Cell>
+                    <div className="v" style={{ fontSize: 'var(--t-small)' }}>
+                      {rated.length === 2 ? (
+                        <span className="ok">both checks rated</span>
+                      ) : rated.length === 1 && rated[0] ? (
+                        <span className="warn">1 of 2 — {stageName(rated[0].stage)} only</span>
+                      ) : (
+                        <span className="bad">neither check rated</span>
+                      )}
+                    </div>
+                  </Cell>
+                </FlexRow>
+              )
+            })}
+        </FlexTable>
+        <Note top={10}>
+          Two checks are expected on every delivery — one on the search, one on the typing. The right-hand
+          column is where the {cover}% coverage figure comes from.
+        </Note>
+      </>
+    )
+  }
+
+  if (focus === 'unrated') {
+    const gaps: { d: Delivery; st: string; who: string }[] = []
+    dels.forEach((d) =>
+      ['Search', 'Typing'].forEach((st) => {
+        if (!rows.some((y) => y.order === d.id && y.stage === st))
+          gaps.push({ d, st, who: d.byName?.[st] ?? 'unknown' })
+      }),
+    )
+    const byWho: Record<string, number> = {}
+    gaps.forEach((g) => (byWho[g.who] = (byWho[g.who] ?? 0) + 1))
+    const peak = Math.max(1, ...Object.values(byWho))
+
+    return (
+      <>
+        {head}
+        <SectionHead>{gaps.length} checks were never filled in</SectionHead>
+        <Banner kind="d" icon="⚑" title="This is the gap, and it is bigger than any score on the page">
+          {gaps.length} of {dels.length * 2} checks have no rating at all. Nothing was recorded, so nothing
+          can be reviewed — and every average on this report is drawn from the {cover}% that were. Making a
+          rating mandatory before an order can be marked Sent closes this without asking anyone to work
+          differently.
+        </Banner>
+        <Card padded top={14}>
+          <Label>Whose work went unchecked</Label>
+          {Object.entries(byWho)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 12)
+            .map(([n, c]) => (
+              <BarRow
+                key={n}
+                cols="190px 1fr 70px"
+                padding="5px 0"
+                labelClass=""
+                label={n}
+                value={c}
+                max={peak}
+                color="var(--warn)"
+                rightClass="mono gr"
+                right={c}
+              />
+            ))}
+          <Note top={12}>
+            Spread fairly evenly, which says the gap is a process problem rather than one person being
+            skipped.{' '}
+            <Press style={{ color: 'var(--brand)' }} onClick={onOpenRules}>
+              The rule that fixes it
+            </Press>
+          </Note>
+        </Card>
+        <SectionHead>Every unrated check</SectionHead>
+        <FlexTable
+          cols="40px 110px 160px 150px 130px 1fr"
+          min={800}
+          head={['#', 'Delivered', 'Order', 'Client', 'Stage', 'Whose work']}
+        >
+          {gaps
+            .sort((a, b) => +b.d.d - +a.d.d)
+            .map((g, i) => (
+              <FlexRow cols="40px 110px 160px 150px 130px 1fr" key={`${g.d.id}-${g.st}-${i}`}>
+                <Cell v={i + 1} mono tone="gr" />
+                <Cell v={fmtDate(g.d.d)} mono />
+                <Cell v={g.d.id} mono s={g.d.pr} />
+                <Cell v={g.d.cl} />
+                <Cell v={stageName(g.st)} />
+                <Cell v={g.who} />
+              </FlexRow>
+            ))}
+        </FlexTable>
+      </>
+    )
+  }
+
+  if (focus === 'spread') {
+    const marks: number[] = []
+    rows.forEach((x) => marks.push(x.acc, x.comp, x.fmt))
+    const fives = marks.filter((m) => m === 5).length
+    const sorted = people.slice().sort((a, b) => b.o - a.o)
+    const lo = sorted.length ? Math.min(...sorted.map((x) => x.o)) : 0
+    const hi = sorted.length ? Math.max(...sorted.map((x) => x.o)) : 0
+
+    return (
+      <>
+        {head}
+        <SectionHead>
+          Every one of the {marks.length.toLocaleString()} marks behind {averageText(overall)}
+        </SectionHead>
+        <Card padded>
+          <Label>How the marks fall</Label>
+          <MarkSpread marks={marks} mode="team" />
+          <Note top={12}>
+            <b>{marks.length ? ((fives / marks.length) * 100).toFixed(0) : 0}% of all marks are a 5.</b> An
+            average built from that cannot rank anyone — the question is not who scores lower, it is whether
+            raters are willing to give a 3.
+          </Note>
+        </Card>
+        <SectionHead>Everyone, best to worst — and how little separates them</SectionHead>
+        <Card padded>
+          {sorted.map((p) => {
+            const pos = hi === lo ? 50 : ((p.o - lo) / (hi - lo)) * 100
+            return (
+              <BarGrid key={p.n} cols="170px 1fr 70px" gap={12} padding="5px 0">
+                <span>{p.n}</span>
+                <span
+                  style={{ position: 'relative', height: 14, background: 'var(--rail)', borderRadius: 5 }}
+                >
+                  <span
+                    style={{
+                      position: 'absolute',
+                      left: `calc(${pos}% - 5px)`,
+                      top: 2,
+                      width: 10,
+                      height: 10,
+                      borderRadius: '50%',
+                      background: 'var(--brand)',
+                    }}
+                  />
+                </span>
+                <span className="mono" style={{ textAlign: 'right' }}>
+                  {p.o.toFixed(2)}
+                </span>
+              </BarGrid>
+            )
+          })}
+          <Note top={12}>
+            The dots span the full width, but the scale underneath runs only from {lo.toFixed(2)} to{' '}
+            {hi.toFixed(2)}. Stretching a {(hi - lo).toFixed(2)} range across a chart is how a flat measure
+            gets mistaken for a meaningful one.
+          </Note>
+        </Card>
+      </>
+    )
+  }
+
+  const list = defects.slice().sort((a, b) => +b.d - +a.d)
+  const reasons = reasonCounts(list)
+
+  return (
+    <>
+      {head}
+      <SectionHead>
+        What the {list.length} defect{list.length === 1 ? ' was' : 's were'}
+      </SectionHead>
+      {reasons.length ? (
+        <Card padded bottom={14}>
+          <Label>Grouped by reason</Label>
+          <Rows bare style={{ marginTop: 6 }}>
+            {reasons.map(([why, n]) => (
+                <div className="rw" key={why}>
+                  <span className={n > 1 ? 'warn' : 'gr'} style={{ fontSize: 'var(--t-lead)' }}>
+                    {n > 1 ? '⚑' : '·'}
+                  </span>
+                  <span>
+                    <b>{why}</b>
+                    {n > 1 ? (
+                      <div className="sd warn">
+                        seen {n} times across the team — worth fixing in the process, not with one person
+                      </div>
+                    ) : null}
+                  </span>
+                  <span className="mono gr">{n}</span>
+                </div>
+              ))}
+          </Rows>
+        </Card>
+      ) : null}
+      <FlexTable
+        cols="40px 105px 150px 140px 120px 110px 1fr"
+        min={940}
+        head={['#', 'Date', 'Order', 'Who', 'Stage', 'Marks', 'What the rater said']}
+      >
+        {list.map((x, i) => (
+          <FlexRow cols="40px 105px 150px 140px 120px 110px 1fr" key={`${x.order}-${i}`}>
+            <Cell v={i + 1} mono tone="gr" />
+            <Cell v={fmtDate(x.d)} mono />
+            <Cell v={x.order} mono s={`${x.cl} · ${x.pr}`} />
+            <Cell>
+              <Press
+                style={{ fontSize: 'var(--t-small)', color: 'var(--brand)' }}
+                onClick={() => onOpenPerson(x.onName)}
+              >
+                {x.onName}
+              </Press>
+              <div className="s">by {x.byName}</div>
+            </Cell>
+            <Cell v={stageName(x.stage)} />
+            <RatingMarks x={x} />
+            <Cell v={x.note ?? 'no reason recorded'} tone="bad" s={x.crit ?? undefined} />
+          </FlexRow>
+        ))}
+      </FlexTable>
+      <Note top={10}>
+        Click a name to see everything about that person. A reason appearing more than once is a process
+        problem — the same mistake made by different people is not a coincidence.
+      </Note>
+    </>
+  )
+}

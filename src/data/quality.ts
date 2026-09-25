@@ -1,6 +1,5 @@
 export interface QcEntry {
   d: Date
-  dk: string
   order: string
   cl: string
   pr: string
@@ -18,7 +17,7 @@ export interface QcEntry {
   note: string | null
 }
 
-type RawQcEntry = Omit<QcEntry, 'd'> & { d: string }
+type RawQcEntry = Omit<QcEntry, 'd'> & { d: string; dk?: string }
 
 export const QC_DAYS = 90
 
@@ -92,11 +91,7 @@ let pending: Promise<QcEntry[]> | null = null
 
 export function loadQcLog(): Promise<QcEntry[]> {
   pending ??= import('./quality-log.json').then((m) =>
-    (m.default as RawQcEntry[]).map((r) => ({ ...r, d: new Date(r.d) })),
+    (m.default as RawQcEntry[]).map(({ dk: _key, ...r }) => ({ ...r, d: new Date(r.d) })),
   )
   return pending
-}
-
-export function resetQcLog(): void {
-  pending = null
 }

@@ -1,24 +1,37 @@
-import { useGo } from '@/lib/nav'
-import { useSession } from '@/state/session'
-import { useUi } from '@/state/ui'
-import { visibleNav } from '@/lib/permissions'
-import { initials } from '@/lib/format'
-import { pastDueCount, brokenLinks, followUpCount } from '@/lib/derived'
-import { TENANTS } from '@/data/org'
-import { Chip, Row, Rows } from '@/components/ui'
+import type { Ref } from 'react'
+import { useGo } from '@/shared/hooks/useGo'
+import { useSession } from '@/domain/auth/SessionProvider'
+import { useUi } from '@/shared/ui/UiProvider'
+import { visibleNav } from '@/domain/auth/permissions'
+import { initials } from '@/shared/lib/format'
+import { usePastDueCount } from '@/domain/orders/orderCounts'
+import { useBrokenLinks } from '@/domain/counties/links'
+import { followUpCount, useLeads } from '@/domain/leads/leads'
+import { useWorkspaces } from '@/domain/company/company'
+import { Chip } from '@/shared/ui/Chip'
+import { Row, Rows } from '@/shared/ui/DetailList'
+import { pressable } from '@/shared/ui/pressable'
+import { IconButton } from '@/shared/ui/Button'
+import { Anchor } from '@/shared/ui/Anchor'
+import { SIDENAV_ID, type Drawer } from './drawer'
+import { navBadge } from './badges'
+import { Note } from '@/shared/ui/Layout'
 
-function badgeFor(route: string) {
-  const overdue = pastDueCount()
-  if (route === 'dash' && overdue) return { n: overdue, warn: false }
-  const fu = followUpCount()
-  if (route === 'leads' && fu) return { n: fu, warn: true }
-  const bl = brokenLinks().length
-  if (route === 'linkcheck' && bl) return { n: bl, warn: false }
-  return null
-}
-
-export function Sidebar({ current }: { current: string }) {
+export function Sidebar({
+  current,
+  drawer,
+  ref,
+  onClose,
+}: {
+  current: string
+  drawer: Drawer
+  ref: Ref<HTMLElement>
+  onClose: () => void
+}) {
   const { me, tenant, switchTenant, roleLabel, setNavOpen, memberships } = useSession()
+  const seeded = useWorkspaces()
+  const leads = useLeads()
+  const counts = { overdue: usePastDueCount(), followUps: followUpCount(leads), brokenLinks: useBrokenLinks().length }
   const { openModal, closeModal } = useUi()
   const navigate = useGo()
 
@@ -31,17 +44,17 @@ export function Sidebar({ current }: { current: string }) {
 
   const workspaces = memberships.length
     ? memberships.map((m) => ({ id: m.id, name: m.name, plan: m.plan }))
-    : TENANTS.map((t) => ({ id: t.id, name: t.name, plan: t.plan }))
+    : seeded.map((t) => ({ id: t.id, name: t.name, plan: t.plan }))
 
   const openTenantPicker = () =>
     openModal({
       title: 'Switch company',
       body: (
         <>
-          <p className="gr" style={{ fontSize: 'var(--t-small)', marginBottom: 14 }}>
+          <Note bottom={14}>
             Each company is a separate workspace. Staff, orders, clients, counties and quality data are
             private to it — nothing is shared between companies.
-          </p>
+          </Note>
           <Rows>
             {workspaces.map((t) =>
               t.id === 'new' ? (
@@ -76,19 +89,25 @@ export function Sidebar({ current }: { current: string }) {
     })
 
   return (
-    <aside className="side">
+    <aside
+      className="side"
+      id={SIDENAV_ID}
+      ref={ref}
+      tabIndex={-1}
+      inert={drawer.sideInert}
+    >
       <div className="logo">
         <i>◧</i> Title CRM
+        {drawer.open ? (
+          <IconButton className="navclose" label="Close navigation" onClick={onClose}>
+            ×
+          </IconButton>
+        ) : null}
       </div>
 
       <div
         className="tenant"
-        role="button"
-        tabIndex={0}
-        onClick={openTenantPicker}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') openTenantPicker()
-        }}
+        {...pressable(openTenantPicker)}
       >
         <span className="av">{initials(tenant.name)}</span>
         <span className="nm">
@@ -103,16 +122,14 @@ export function Sidebar({ current }: { current: string }) {
           <div key={g.l}>
             <div className="navlbl">{g.l}</div>
             {g.t.map(([label, route, glyph]) => {
-              const badge = badgeFor(route)
+              const badge = navBadge(route, counts)
               return (
-                <a
+                <Anchor
                   key={route}
                   href={`/${route}`}
                   className={route === current ? 'on' : ''}
                   aria-current={route === current ? 'page' : undefined}
                   onClick={(e) => {
-                    /* A plain click stays in the app; a modified or middle click is the
-                       browser's, which is how an item opens in a new tab. */
                     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
                     e.preventDefault()
                     go(route)
@@ -125,7 +142,7 @@ export function Sidebar({ current }: { current: string }) {
                       {badge.n}
                     </span>
                   ) : null}
-                </a>
+                </Anchor>
               )
             })}
           </div>
@@ -138,15 +155,9 @@ export function Sidebar({ current }: { current: string }) {
           <b>{me.n}</b>
           <span>{roleLabel}</span>
         </span>
-        <button
-          type="button"
-          className="lo"
-          aria-label="Sign out"
-          title="Sign out"
-          onClick={() => go('signin')}
-        >
+        <IconButton className="lo" label="Sign out" title="Sign out" onClick={() => go('signin')}>
           ⏻
-        </button>
+        </IconButton>
       </div>
     </aside>
   )

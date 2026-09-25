@@ -17,15 +17,6 @@ import { readDecision, readLoanRequest } from './validate'
 
 export const hrmsRoutes = new Hono<Ctx>()
 
-/**
- * The HRMS group. Two capabilities separate the personal views from the company
- * ones, and they are the inverse of each other on purpose: somebody who runs
- * payroll uses the run, not their own payslip screen.
- *
- * Where a route serves both, it narrows to the caller rather than refusing — a
- * person may always see their own leave and their own payslips.
- */
-
 hrmsRoutes.get('/attendance', needs('all'), async (c) => {
   const period = c.req.query('period')
   const rows = await withTenant(c.get('tenantId'), (tx) => {
@@ -49,7 +40,6 @@ hrmsRoutes.get('/attendance', needs('all'), async (c) => {
   return c.json(rows)
 })
 
-/** Everyone's leave for an approver; your own otherwise. */
 hrmsRoutes.get('/leave', async (c) => {
   const mine = !c.get('capabilities').has('people')
   const personId = c.get('personId')
@@ -85,8 +75,6 @@ hrmsRoutes.post('/leave/:id/decision', needs('people'), async (c) => {
     const [row] = await tx.select().from(leaveRequests).where(eq(leaveRequests.id, id)).limit(1)
     if (!row) return { error: 'Not found' as const }
 
-    /* Deciding your own leave is the same shape of problem as reviewing your own
-       search: the check is not a check if the author performs it. */
     if (row.personId === c.get('personId')) {
       return { error: 'You cannot decide your own leave' as const }
     }
@@ -109,7 +97,6 @@ hrmsRoutes.get('/payruns', needs('pricing'), async (c) => {
   return c.json(rows)
 })
 
-/** The run's payslips for payroll staff; your own otherwise. */
 hrmsRoutes.get('/payslips', async (c) => {
   const mine = !c.get('capabilities').has('pricing')
   const personId = c.get('personId')
@@ -135,7 +122,6 @@ hrmsRoutes.get('/payslips', async (c) => {
     return mine ? q.where(eq(payslips.personId, personId)) : q
   })
 
-  /* An unpublished run is a draft: payroll can see it, the person cannot. */
   return c.json(mine ? rows.filter((r) => r.published) : rows)
 })
 
@@ -159,14 +145,6 @@ hrmsRoutes.get('/petty-cash', needs('pricing'), async (c) => {
   return c.json(rows)
 })
 
-/**
- * Loans & advances — not called by the screen yet, which still runs on
- * bundled seed data like the rest of HRMS. Built to the same shape as
- * `/leave` so the swap is a data-source change, not a redesign, whenever
- * this group migrates together.
- */
-
-/** Everyone's loans for pricing; your own otherwise. */
 hrmsRoutes.get('/loans', async (c) => {
   const mine = !c.get('capabilities').has('pricing')
   const personId = c.get('personId')
@@ -195,7 +173,6 @@ hrmsRoutes.get('/loans', async (c) => {
   return c.json(rows)
 })
 
-/** Self-service, like applying for leave — no capability needed to ask. */
 hrmsRoutes.post('/loans', async (c) => {
   const read = readLoanRequest(await c.req.json().catch(() => null))
   if (!read.ok) return c.json({ error: read.error }, 400)
@@ -227,8 +204,6 @@ hrmsRoutes.post('/loans/:id/decision', needs('pricing'), async (c) => {
     if (row.status !== 'requested') {
       return { error: `Cannot decide a loan that is ${row.status}` as const }
     }
-    /* Same shape of problem as deciding your own leave — the check is not a
-       check if the person it is about performs it. */
     if (row.personId === c.get('personId')) {
       return { error: 'You cannot decide your own request' as const }
     }

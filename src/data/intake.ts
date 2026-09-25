@@ -1,11 +1,12 @@
-import { hrs } from '@/lib/format'
 import type { MailItem } from './types'
 
-export const MAILBOX = (): MailItem[] => [
+const hoursFrom = (at: Date, h: number) => new Date(at.getTime() + h * 3600000)
+
+export const MAILBOX = (at: Date): MailItem[] => [
   {
     f: 'Heather Reller · CSS',
     s: 'Attached New Order — Update Search — HOLD for effective date to be at or after new DOT/MTG CSSWV-635007',
-    t: hrs(-1.5),
+    t: hoursFrom(at, -1.5),
     at: ['Update Search Order.pdf (292 KB)', 'CSSWV-635007.Doc1.PDF (856 KB)'],
     x: [
       ['Order no', 'CSSWV-635007'],
@@ -19,7 +20,7 @@ export const MAILBOX = (): MailItem[] => [
   {
     f: 'Meadow Backus · CSS',
     s: 'FW: Attached new order — Search Package ***PLEASE READ REQUIREMENTS*** CSSSC-638312',
-    t: hrs(-2.2),
+    t: hoursFrom(at, -2.2),
     at: ['New Search Order_2.pdf (375 KB)'],
     x: [
       ['Order no', 'CSSSC-638312'],
@@ -33,7 +34,7 @@ export const MAILBOX = (): MailItem[] => [
   {
     f: 'Priya Kulkarni · MGR',
     s: 'Question on 4192254-2',
-    t: hrs(-4),
+    t: hoursFrom(at, -4),
     at: [],
     x: [
       ['Order no', '4192254-2 — matches an existing order'],

@@ -1,7 +1,6 @@
 export interface Delivery {
   id: string
   d: Date
-  dk: string
   cl: string
   pr: string
   slaH: number
@@ -12,7 +11,7 @@ export interface Delivery {
   late: boolean
 }
 
-type RawDelivery = Omit<Delivery, 'd'> & { d: string }
+type RawDelivery = Omit<Delivery, 'd'> & { d: string; dk?: string }
 
 let pending: Promise<Delivery[]> | null = null
 
@@ -31,11 +30,7 @@ const reviveDate = (iso: string): Date => {
 
 export function loadDeliveries(): Promise<Delivery[]> {
   pending ??= import('./deliveries.json').then((m) =>
-    (m.default as RawDelivery[]).map((r) => ({ ...r, d: reviveDate(r.d) })),
+    (m.default as RawDelivery[]).map(({ dk: _key, ...r }) => ({ ...r, d: reviveDate(r.d) })),
   )
   return pending
-}
-
-export function resetDeliveries(): void {
-  pending = null
 }

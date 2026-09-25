@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { eq, sql } from 'drizzle-orm'
 import { createDb, withTenantOn, type Db } from '../../server/db/connect'
+import { one } from '../must'
 import {
   clients,
   departments,
@@ -14,17 +15,6 @@ import {
   roles,
   tenants,
 } from '../../server/db/schema'
-
-/**
- * The API's own guarantees, exercised through the real app rather than by
- * reading it.
- *
- * The claim worth testing is the one that looks wrong: the workspace travels in
- * a client-supplied header. That is safe only because capabilities are resolved
- * *inside* the named workspace for the signed-in user, so naming one you do not
- * belong to yields nothing to check against. "Looks like a hole, is not one" is
- * exactly the kind of reasoning that deserves a test rather than a comment.
- */
 
 const ownerUrl = process.env.DATABASE_URL
 const appUrl = process.env.APP_DATABASE_URL
@@ -47,9 +37,6 @@ describe.skipIf(!configured)('the API', () => {
       }),
     )
 
-  /* Unique per run, and cleaned up on the way in. A fixture with a fixed key
-     passes once and then collides, and a failing beforeAll reports as "skipped"
-     rather than red — so a stateful fixture can quietly stop testing anything. */
   const ref = `test-isolation-${Date.now()}`
 
   beforeAll(async () => {
@@ -61,20 +48,14 @@ describe.skipIf(!configured)('the API', () => {
     keystone = rows.find((r) => r.slug === 'ka')!.id
     peach = rows.find((r) => r.slug === 'ps')!.id
 
-    /* Clear anything a previous run left behind, so the suite is re-runnable
-       against a database that is not reset between runs. */
     await owner.execute(sql`delete from order_stages where order_id in (select id from orders where ref like 'test-order-%')`)
     await owner.execute(sql`delete from order_events where order_id in (select id from orders where ref like 'test-order-%')`)
     await owner.execute(sql`delete from orders where ref like 'test-order-%'`)
-    /* Payslips go with their run; the leave rows are hung on a *seeded* person,
-       so nothing cascades them away and they have to be named. */
     await owner.execute(sql`delete from pay_runs where period like 'test-narrowing%'`)
     await owner.execute(sql`delete from leave_requests where reason like 'test-narrowing%'`)
     await owner.execute(sql`delete from people where ref like 'test-isolation%'`)
     await owner.execute(sql`delete from "user" where email like 'isolation-%@example.test'`)
 
-    /* A real sign-up through Better Auth, so the session is one the middleware
-       would actually accept rather than one the test forged. */
     const email = `isolation-${Date.now()}@example.test`
     const signUp = await app.fetch(
       new Request('http://localhost/api/auth/sign-up/email', {
@@ -86,17 +67,16 @@ describe.skipIf(!configured)('the API', () => {
     expect(signUp.status, await signUp.clone().text()).toBeLessThan(400)
 
     const setCookie = signUp.headers.get('set-cookie') ?? ''
-    cookie = setCookie.split(',').map((c) => c.split(';')[0].trim()).join('; ')
+    cookie = setCookie.split(',').map((c) => (c.split(';')[0] ?? '').trim()).join('; ')
     expect(cookie, 'no session cookie came back from sign-up').toBeTruthy()
 
-    const [{ id: userId }] = await owner.execute<{ id: string }>(
-      sql`select id from "user" where email = ${email}`,
+    const { id: userId } = await one(
+      owner.execute<{ id: string }>(sql`select id from "user" where email = ${email}`),
+      'the user just signed up',
     )
 
-    /* Membership of exactly one workspace — Keystone. Peach State is the one
-       this person has no business seeing. */
     await withTenantOn(owner, keystone, async (tx) => {
-      const [adminRole] = await tx.select().from(roles).where(eq(roles.key, 'admin')).limit(1)
+      const adminRole = await one(tx.select().from(roles).where(eq(roles.key, 'admin')).limit(1), 'the admin role')
       await tx.insert(people).values({
         tenantId: keystone,
         userId,
@@ -122,13 +102,6 @@ describe.skipIf(!configured)('the API', () => {
     })
   })
 
-  /*
-   * The bootstrap. Everything else in this file names a workspace in a header,
-   * which is what a client can only do *after* this exchange — and for a while
-   * nothing tested the step before it, so nobody noticed that a correct email
-   * and password could not get anybody in: `/me` refused without a workspace,
-   * and the only place to learn a workspace id refused for the same reason.
-   */
   describe('before a workspace has been chosen', () => {
     it('still answers which workspaces they are in', async () => {
       const res = await call('/api/memberships')
@@ -136,7 +109,6 @@ describe.skipIf(!configured)('the API', () => {
 
       const body = (await res.json()) as { id: string; current: boolean }[]
       expect(body.map((m) => m.id)).toEqual([keystone])
-      /* None is current yet — that is the state this call exists to end. */
       expect(body.every((m) => !m.current)).toBe(true)
     })
 
@@ -155,7 +127,6 @@ describe.skipIf(!configured)('the API', () => {
 
       const body = (await res.json()) as { capabilities: string[]; tenant: { id: string } }
       expect(body.tenant.id).toBe(keystone)
-      /* From role_permissions in the database, not from a claim in the token. */
       expect(body.capabilities).toContain('all')
       expect(body.capabilities).toContain('pricing')
     })
@@ -205,29 +176,32 @@ describe.skipIf(!configured)('the API', () => {
 
     beforeAll(async () => {
       await withTenantOn(owner, keystone, async (tx) => {
-        const [client] = await tx.select().from(clients).limit(1)
-        const [product] = await tx.select().from(products).limit(1)
+        const client = await one(tx.select().from(clients).limit(1), 'a client')
+        const product = await one(tx.select().from(products).limit(1), 'a product')
         const depts = await tx.select().from(departments)
         const search = depts.find((d) => d.name === 'Search')!
         const searchQc = depts.find((d) => d.name === 'Search QC')!
 
-        const [worker] = await tx.select().from(people).where(eq(people.ref, 'pd')).limit(1)
+        const worker = await one(tx.select().from(people).where(eq(people.ref, 'pd')).limit(1), 'the seeded person pd')
         assignee = worker.id
 
-        const [order] = await tx
-          .insert(orders)
-          .values({
-            tenantId: keystone,
-            ref: `test-order-${Date.now()}`,
-            clientId: client.id,
-            productId: product.id,
-            state: 'PA',
-            county: 'Cambria',
-            property: '1 Test Street',
-            dueAt: new Date(Date.now() + 86_400_000),
-            fee: '100.00',
-          })
-          .returning()
+        const order = await one(
+          tx
+            .insert(orders)
+            .values({
+              tenantId: keystone,
+              ref: `test-order-${Date.now()}`,
+              clientId: client.id,
+              productId: product.id,
+              state: 'PA',
+              county: 'Cambria',
+              property: '1 Test Street',
+              dueAt: new Date(Date.now() + 86_400_000),
+              fee: '100.00',
+            })
+            .returning(),
+          'the order just made',
+        )
 
         const stages = await tx
           .insert(orderStages)
@@ -252,9 +226,8 @@ describe.skipIf(!configured)('the API', () => {
       )
 
     it('places somebody on the search, and records why', async () => {
-      /* The role was dropped to staff by an earlier test, so put assign back. */
       await withTenantOn(owner, keystone, async (tx) => {
-        const [admin] = await tx.select().from(roles).where(eq(roles.key, 'admin')).limit(1)
+        const admin = await one(tx.select().from(roles).where(eq(roles.key, 'admin')).limit(1), 'the admin role')
         await tx.update(people).set({ roleId: admin.id }).where(eq(people.ref, ref))
       })
 
@@ -264,15 +237,12 @@ describe.skipIf(!configured)('the API', () => {
       const [row] = await withTenantOn(owner, keystone, (tx) =>
         tx.select().from(orderStages).where(eq(orderStages.id, searchStageId)),
       )
-      expect(row.assigneeId).toBe(assignee)
-      /* The schema always had a column for the reason; it is now written. */
-      expect(row.decision, 'the placement recorded no reason').toBeTruthy()
-      expect(row.decision!.length).toBeGreaterThan(0)
+      expect(row?.assigneeId).toBe(assignee)
+      expect(row?.decision, 'the placement recorded no reason').toBeTruthy()
+      expect(row?.decision?.length).toBeGreaterThan(0)
     })
 
     it('refuses to let the same person check their own search', async () => {
-      /* Enforced in the engine, in the picker, and here. This is the layer that
-         does not trust the other two. */
       const res = await assign('any', qcStageId, assignee)
       expect(res.status).toBe(409)
       await expect(res.json()).resolves.toMatchObject({ error: 'Would be self-review' })
@@ -280,25 +250,23 @@ describe.skipIf(!configured)('the API', () => {
       const [row] = await withTenantOn(owner, keystone, (tx) =>
         tx.select().from(orderStages).where(eq(orderStages.id, qcStageId)),
       )
-      expect(row.assigneeId, 'the refused assignment was written anyway').toBeNull()
+      expect(row?.assigneeId, 'the refused assignment was written anyway').toBeNull()
     })
 
     it('accepts a different person on the QC', async () => {
-      const other = await withTenantOn(owner, keystone, (tx) =>
-        tx.select().from(people).where(eq(people.ref, 'ln')).limit(1),
+      const other = await one(
+        withTenantOn(owner, keystone, (tx) => tx.select().from(people).where(eq(people.ref, 'ln')).limit(1)),
+        'the seeded person ln',
       )
-      const res = await assign('any', qcStageId, other[0].id)
+      const res = await assign('any', qcStageId, other.id)
       expect(res.status, await res.clone().text()).toBe(200)
     })
   })
 
   describe('capability guards', () => {
     it('refuses a route the role lacks', async () => {
-      /* Drop to a role with no pricing capability and the same session must stop
-         seeing invoices — the guard reads the database per request, so this
-         takes effect without signing in again. */
       await withTenantOn(owner, keystone, async (tx) => {
-        const [staffRole] = await tx.select().from(roles).where(eq(roles.key, 'staff')).limit(1)
+        const staffRole = await one(tx.select().from(roles).where(eq(roles.key, 'staff')).limit(1), 'the staff role')
         await tx.update(people).set({ roleId: staffRole.id }).where(eq(people.ref, ref))
       })
 
@@ -310,37 +278,11 @@ describe.skipIf(!configured)('the API', () => {
     })
 
     it('narrows the order register instead of refusing it', async () => {
-      /* Someone without "see every order" is not locked out of Orders — they
-         see the ones they are on. The register and the API agree about that.
-         *Which* orders come back is asserted below, where there are fixtures to
-         assert it against; what this one pins is that the answer is an answer
-         and not a 403, because "narrows" and "refuses" are the two ways this
-         route could have gone and only one of them is right. */
       const res = await call('/api/orders', keystone)
       expect(res.status, await res.clone().text()).toBe(200)
     })
   })
 
-  /**
-   * Narrowing to the person, not just to the workspace.
-   *
-   * Row-level security scopes every query to a workspace and stops there — a
-   * colleague's payslip is in the same workspace as yours, and Postgres has no
-   * opinion about that. What keeps it off your screen is four `where` clauses
-   * and one `.filter` in the handlers, all of them ordinary code:
-   *
-   *   hrms.ts:73    leave     → your own unless you can decide leave
-   *   hrms.ts:134   payslips  → your own unless you run payroll
-   *   hrms.ts:138   payslips  → published runs only, for the person they are about
-   *   production.ts:79   the order register → the orders you are on
-   *   production.ts:100  one order          → the same, or 404
-   *
-   * Every test below asks the same question twice against the same rows — once
-   * as staff, once as an admin — because a request that returns nothing proves
-   * nothing. The admin run is the counter-example: it shows the row is there to
-   * be found, so the staff run's *absence* is the gate working rather than an
-   * empty table.
-   */
   describe('narrowing to the person', () => {
     const colleagueRef = 'kv'
     const colleagueName = 'Kavitha V'
@@ -348,12 +290,9 @@ describe.skipIf(!configured)('the API', () => {
     let mine: { payslip: string; draft: string; leave: string; order: string; orderRef: string }
     let theirs: { payslip: string; leave: string; order: string; orderRef: string }
 
-    /* The capability guard reads the database per request, so a role change
-       takes effect on the next call without signing in again — which is what
-       lets one session stand in for two people. */
     const beRole = (key: 'admin' | 'staff') =>
       withTenantOn(owner, keystone, async (tx) => {
-        const [role] = await tx.select().from(roles).where(eq(roles.key, key)).limit(1)
+        const role = await one(tx.select().from(roles).where(eq(roles.key, key)).limit(1), 'the role')
         await tx.update(people).set({ roleId: role.id }).where(eq(people.ref, ref))
       })
 
@@ -362,12 +301,10 @@ describe.skipIf(!configured)('the API', () => {
 
     beforeAll(async () => {
       await withTenantOn(owner, keystone, async (tx) => {
-        const [me] = await tx.select().from(people).where(eq(people.ref, ref)).limit(1)
-        const [them] = await tx.select().from(people).where(eq(people.ref, colleagueRef)).limit(1)
-        expect(them, `the seed no longer has a person called ${colleagueRef}`).toBeDefined()
+        const me = await one(tx.select().from(people).where(eq(people.ref, ref)).limit(1), 'the signed-in person')
+        const them = await one(tx.select().from(people).where(eq(people.ref, colleagueRef)).limit(1), `the seed person ${colleagueRef}`)
         expect(them.name).toBe(colleagueName)
 
-        /* Two runs, because the published/draft split is its own gate. */
         const runs = await tx
           .insert(payRuns)
           .values([
@@ -397,9 +334,9 @@ describe.skipIf(!configured)('the API', () => {
           ])
           .returning()
 
-        const [client] = await tx.select().from(clients).limit(1)
-        const [product] = await tx.select().from(products).limit(1)
-        const [search] = await tx.select().from(departments).where(eq(departments.name, 'Search')).limit(1)
+        const client = await one(tx.select().from(clients).limit(1), 'a client')
+        const product = await one(tx.select().from(products).limit(1), 'a product')
+        const search = await one(tx.select().from(departments).where(eq(departments.name, 'Search')).limit(1), 'the Search department')
 
         const stamp = Date.now()
         const refs = { mine: `test-order-mine-${stamp}`, theirs: `test-order-theirs-${stamp}` }
@@ -421,8 +358,6 @@ describe.skipIf(!configured)('the API', () => {
           .returning()
         const orderFor = (r: string) => both.find((o) => o.ref === r)!
 
-        /* One stage each. Being on a stage of an order is the whole of what
-           "your order" means to this API — there is no other column for it. */
         await tx.insert(orderStages).values([
           { tenantId: keystone, orderId: orderFor(refs.mine).id, departmentId: search.id, assigneeId: me.id },
           { tenantId: keystone, orderId: orderFor(refs.theirs).id, departmentId: search.id, assigneeId: them.id },
@@ -446,7 +381,7 @@ describe.skipIf(!configured)('the API', () => {
 
     describe('payslips', () => {
       it('gives a person their own and not their colleague’s', async () => {
-        await beRole('staff') // no "pricing"
+        await beRole('staff')
         const res = await call('/api/hr/payslips', keystone)
         expect(res.status, await res.clone().text()).toBe(200)
 
@@ -456,12 +391,11 @@ describe.skipIf(!configured)('the API', () => {
           body.map((r) => r.id),
           `${colleagueName}'s payslip was served to somebody else`,
         ).not.toContain(theirs.payslip)
-        /* Not one row about anybody else, named or otherwise. */
         expect(body.every((r) => r.person === 'Isolation Test')).toBe(true)
       })
 
       it('and hands the same row to payroll, which is what makes that a gate', async () => {
-        await beRole('admin') // holds "pricing"
+        await beRole('admin')
         const seen = await ids(await call('/api/hr/payslips', keystone))
         expect(seen, 'the counter-example no longer reproduces').toContain(theirs.payslip)
         expect(seen).toContain(mine.payslip)
@@ -483,7 +417,7 @@ describe.skipIf(!configured)('the API', () => {
 
     describe('leave', () => {
       it('gives a person their own and not their colleague’s', async () => {
-        await beRole('staff') // no "people"
+        await beRole('staff')
         const res = await call('/api/hr/leave', keystone)
         expect(res.status, await res.clone().text()).toBe(200)
 
@@ -497,7 +431,7 @@ describe.skipIf(!configured)('the API', () => {
       })
 
       it('and shows an approver both, which is what makes that a gate', async () => {
-        await beRole('admin') // holds "people"
+        await beRole('admin')
         const seen = await ids(await call('/api/hr/leave', keystone))
         expect(seen, 'the counter-example no longer reproduces').toContain(theirs.leave)
         expect(seen).toContain(mine.leave)
@@ -509,7 +443,7 @@ describe.skipIf(!configured)('the API', () => {
         ((await res.json()) as { ref: string }[]).map((r) => r.ref)
 
       it('lists the orders they are on, and not the ones they are not', async () => {
-        await beRole('staff') // no "all"
+        await beRole('staff')
         const res = await call('/api/orders', keystone)
         expect(res.status, await res.clone().text()).toBe(200)
 
@@ -521,7 +455,7 @@ describe.skipIf(!configured)('the API', () => {
       })
 
       it('and lists both for a lead, which is what makes that a gate', async () => {
-        await beRole('admin') // holds "all"
+        await beRole('admin')
         const seen = await refsIn(await call('/api/orders', keystone))
         expect(seen, 'the counter-example no longer reproduces').toContain(theirs.orderRef)
         expect(seen).toContain(mine.orderRef)
@@ -537,8 +471,6 @@ describe.skipIf(!configured)('the API', () => {
       })
 
       it('answers 404 for one they are not, rather than to anybody holding the id', async () => {
-        /* The register hiding a row is not the protection. Someone who reads an
-           id out of a link, a report or a stale tab arrives here directly. */
         await beRole('staff')
         const res = await call(`/api/orders/${theirs.order}`, keystone)
         expect(res.status, `the detail route handed over ${colleagueName}'s order`).toBe(404)

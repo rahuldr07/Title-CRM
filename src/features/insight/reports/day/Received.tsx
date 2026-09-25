@@ -1,0 +1,398 @@
+import { useStageName } from '@/domain/company/naming'
+import { useState } from 'react'
+import { useGo } from '@/shared/hooks/useGo'
+import { BarRow } from '@/shared/ui/Bar'
+import { Btn } from '@/shared/ui/Button'
+import { MatrixTable, Th } from '@/shared/ui/MatrixTable'
+import { Card, Label } from '@/shared/ui/Card'
+import { Rows } from '@/shared/ui/DetailList'
+import { SectionHead } from '@/shared/ui/PageHead'
+import { Cell, FlexRow, FlexTable } from '@/shared/ui/FlexTable'
+import { FocusHead, FocusKpis } from '@/features/insight/reports/FocusKpis'
+import { DayPicker } from './DayPicker'
+import { curStageOf } from '@/domain/assignment/sla'
+import { useOrders, type EditedOrder } from '@/domain/orders/orders'
+import { receivedDays, receivedOn } from '@/domain/orders/received'
+import { ASSIGN_STAGES, STAGES } from '@/data/org'
+import { PRODUCTS } from '@/data/catalog'
+import { fmtDate, fmtHour, iso, money, parseIso } from '@/shared/lib/format'
+import { now } from '@/shared/lib/clock'
+import { receivedCsv } from '@/features/insight/reports/reportCsv'
+import { useReportExport } from '@/features/insight/reports/reportExport'
+import { useSession } from '@/domain/auth/SessionProvider'
+import { useClients } from '@/domain/company/clients'
+import { Note } from '@/shared/ui/Layout'
+
+const val = (n: number) => (n ? <b className="mono">{n}</b> : <span className="gr">—</span>)
+
+const FOCI = ['all', 'done', 'wip', 'clients']
+
+export function Received({ initialFocus }: { initialFocus?: string | undefined } = {}) {
+  const books = useClients()
+  const stageName = useStageName()
+  const navigate = useGo()
+  const { can } = useSession()
+  const pricing = can('pricing')
+  const clientCols = pricing ? '190px 120px 1fr 130px 140px' : '190px 120px 1fr 140px'
+  const orders = useOrders()
+  const [day, setDay] = useState(() => iso(now()))
+  const [focus, setFocus] = useState(initialFocus && FOCI.includes(initialFocus) ? initialFocus : 'all')
+
+  const os = receivedOn(orders, day)
+  useReportExport(() => receivedCsv(os))
+  const scope = day === 'all' ? `all ${receivedDays(orders).length} days` : fmtDate(parseIso(day))
+  const stageOf = (o: EditedOrder) => curStageOf(o)
+
+  const done = os.filter((o) => !stageOf(o)).length
+  const wip = os.length - done
+  const clients = [...new Set(os.map((o) => o.cl))].sort()
+  const products = PRODUCTS.map((p) => p.id).filter((id) => os.some((o) => o.pr === id))
+  const cell = (c: string, st: string) => os.filter((o) => o.cl === c && stageOf(o) === st).length
+
+  const COLS = '40px 110px 150px 130px 150px 1fr 130px'
+  const orderRows = (list: EditedOrder[]) => (
+    <FlexTable
+      cols={COLS}
+      min={920}
+      head={['#', 'Arrived', 'Order', 'Client', 'Product', 'Where it is now', 'County']}
+    >
+      {list.map((o, oi) => {
+        const st = stageOf(o)
+        return (
+          <FlexRow cols={COLS} key={o.id}>
+            <Cell v={oi + 1} mono tone="gr" />
+            <Cell v={fmtHour(o.recv.getHours())} s={fmtDate(o.recv)} mono />
+            <Cell v={o.id} mono />
+            <Cell v={o.cl} />
+            <Cell v={o.pr} />
+            {st ? (
+              <Cell v={stageName(st)} s={`stage ${ASSIGN_STAGES.indexOf(st) + 1} of ${ASSIGN_STAGES.length}`} />
+            ) : (
+              <Cell v="Completed" tone="ok" s={`all ${ASSIGN_STAGES.length} stages done`} />
+            )}
+            <Cell v={o.co || o.st} />
+          </FlexRow>
+        )
+      })}
+    </FlexTable>
+  )
+
+  const quiet = books.filter((c) => !clients.includes(c.n))
+
+  return (
+    <>
+      <DayPicker value={day} days={receivedDays(orders)} onChange={setDay} />
+
+      <FocusKpis
+        focus={focus}
+        onFocus={setFocus}
+        cards={[
+          { key: 'all', title: 'Orders received', value: os.length, detail: scope, count: os.length },
+          {
+            key: 'done',
+            title: 'Completed',
+            value: <span className="ok">{done}</span>,
+            detail: `${os.length ? Math.round((done / os.length) * 100) : 0}% of intake`,
+            count: done,
+          },
+          {
+            key: 'wip',
+            title: 'Work in progress',
+            value: <span className={wip ? 'warn' : ''}>{wip}</span>,
+            tone: wip ? 'warn' : undefined,
+            detail: 'still moving through the stages',
+            count: wip,
+          },
+          {
+            key: 'clients',
+            title: 'Clients ordering',
+            value: clients.length,
+            detail: `of ${books.length} on the books`,
+            count: clients.length,
+          },
+        ]}
+      />
+
+      {focus === 'clients' ? (
+        <>
+          <FocusHead
+            title={`${clients.length} client${clients.length === 1 ? '' : 's'} ordered — ${scope}`}
+            onBack={() => setFocus('all')}
+          >
+            {quiet.length
+              ? `${quiet.length} on the books sent nothing.`
+              : 'Every client on the books ordered.'}{' '}
+            {pricing ? 'Volume alone does not say who matters; the value column does.' : null}
+          </FocusHead>
+
+          <SectionHead>Who ordered</SectionHead>
+          <FlexTable
+            cols={clientCols}
+            min={pricing ? 760 : 630}
+            head={['Client', 'Orders', 'Share of intake', ...(pricing ? ['Value'] : []), 'Terms']}
+          >
+            {clients.map((n) => {
+              const mine = os.filter((o) => o.cl === n)
+              const rec = books.find((c) => c.n === n)
+              const value = mine.reduce((a, o) => a + o.fee, 0)
+              const pct = Math.round((mine.length / os.length) * 100)
+              return (
+                <FlexRow cols={clientCols} key={n}>
+                  <Cell v={n} />
+                  <Cell v={mine.length} mono />
+                  <Cell>
+                    <span className="bar" style={{ marginTop: 5 }}>
+                      <i style={{ width: `${pct}%`, background: 'var(--brand2)' }} />
+                    </span>
+                    <div className="s">{pct}%</div>
+                  </Cell>
+                  {pricing ? <Cell v={money(value)} mono /> : null}
+                  <Cell v={rec?.terms ?? '—'} tone="gr" />
+                </FlexRow>
+              )
+            })}
+          </FlexTable>
+
+          {quiet.length ? (
+            <>
+              <SectionHead>On the books, but nothing {scope}</SectionHead>
+              <Card padded>
+                <Rows bare>
+                  {quiet.map((c) => (
+                    <div className="rw" key={c.n}>
+                      <span className="gr">·</span>
+                      <span>
+                        <b>{c.n}</b>
+                        <div className="sd gr">
+                          {c.orders.toLocaleString()} orders all time · terms {c.terms}
+                        </div>
+                      </span>
+                      <span>
+                        <Btn
+                          variant="ghost"
+                          small
+                          aria-label={`Open ${c.n}`}
+                          onClick={() =>
+                            navigate({ to: '/clients/$clientCode', params: { clientCode: c.n } })
+                          }
+                        >
+                          Open
+                        </Btn>
+                      </span>
+                    </div>
+                  ))}
+                </Rows>
+                <Note top={12}>
+                  A quiet day is not a lost client, but a quiet fortnight usually is. This is the list worth
+                  checking against.
+                </Note>
+              </Card>
+            </>
+          ) : null}
+        </>
+      ) : null}
+
+      {focus === 'done' || focus === 'wip' ? (
+        <>
+          {(() => {
+            const list = focus === 'done' ? os.filter((o) => !stageOf(o)) : os.filter((o) => stageOf(o))
+            return (
+              <>
+                <FocusHead
+                  title={
+                    focus === 'done'
+                      ? `The ${list.length} completed — ${scope}`
+                      : `The ${list.length} still in progress — ${scope}`
+                  }
+                  onBack={() => setFocus('all')}
+                >
+                  {focus === 'wip'
+                    ? 'Grouped by the stage each one is sitting in right now.'
+                    : 'Through every department and ready to send.'}
+                </FocusHead>
+                {focus === 'wip'
+                  ? ASSIGN_STAGES.filter((st) => list.some((o) => stageOf(o) === st)).map((st) => {
+                      const g = list.filter((o) => stageOf(o) === st)
+                      return (
+                        <div key={st}>
+                          <SectionHead>
+                            {stageName(st)} — {g.length}
+                          </SectionHead>
+                          {orderRows(g)}
+                        </div>
+                      )
+                    })
+                  : (
+                      <>
+                        <SectionHead>Completed</SectionHead>
+                        {orderRows(list)}
+                      </>
+                    )}
+              </>
+            )
+          })()}
+        </>
+      ) : null}
+
+      {focus === 'all' ? (
+        <>
+          <SectionHead>By client and stage — where every order is sitting right now</SectionHead>
+          <Card>
+            <div className="tsc">
+              <MatrixTable label="Orders by client and current stage" min={880}>
+                <thead>
+                  <tr>
+                    <Th>Client</Th>
+                    <Th num>Received</Th>
+                    {STAGES.map((c) => (
+                      <Th key={c} num>
+                        {stageName(c)}
+                      </Th>
+                    ))}
+                    <Th num>Completed</Th>
+                    <Th num>WIP</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clients.length ? (
+                    clients.map((c) => {
+                      const mine = os.filter((o) => o.cl === c)
+                      const cd = mine.filter((o) => !stageOf(o)).length
+                      return (
+                        <tr key={c}>
+                          <td>
+                            <b>{c}</b>
+                          </td>
+                          <td className="n">{val(mine.length)}</td>
+                          {STAGES.map((st) => (
+                            <td className="n" key={st} title={`${c} — ${cell(c, st)} in ${stageName(st)}`}>
+                              {val(cell(c, st))}
+                            </td>
+                          ))}
+                          <td className="n">
+                            {cd ? <b className="mono ok">{cd}</b> : <span className="gr">—</span>}
+                          </td>
+                          <td className="tot">{mine.length - cd || '—'}</td>
+                        </tr>
+                      )
+                    })
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={STAGES.length + 4}
+                        className="gr"
+                        style={{ padding: 22, textAlign: 'center' }}
+                      >
+                        No orders received on {scope}.
+                      </td>
+                    </tr>
+                  )}
+                  {clients.length ? (
+                    <tr>
+                      <td style={{ fontWeight: 700 }}>All clients</td>
+                      <td className="tot">{os.length}</td>
+                      {STAGES.map((st) => (
+                        <td className="tot" key={st}>
+                          {os.filter((o) => stageOf(o) === st).length || '—'}
+                        </td>
+                      ))}
+                      <td className="tot">{done || '—'}</td>
+                      <td className="tot corner">{wip || '—'}</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </MatrixTable>
+            </div>
+          </Card>
+          <Note top={10}>
+            A stage column counts orders <i>currently</i> in that stage, so the stage columns plus Completed
+            equal Received. {stageName('Doc Req')} is raised by hand when a document is missing, which is why it is usually
+            empty.
+          </Note>
+
+          <SectionHead>By client and product — what kind of work came in</SectionHead>
+          <Card>
+            <div className="tsc">
+              <MatrixTable label="Orders by client and product" min={260 + products.length * 72}>
+                <thead>
+                  <tr>
+                    <Th>Client</Th>
+                    {products.map((p) => (
+                      <Th
+                        key={p}
+                        num
+                        title={PRODUCTS.find((x) => x.id === p)?.n ?? p}
+                      >
+                        {p}
+                      </Th>
+                    ))}
+                    <Th num>Total</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clients.map((c) => {
+                    const mine = os.filter((o) => o.cl === c)
+                    return (
+                      <tr key={c}>
+                        <td>
+                          <b>{c}</b>
+                        </td>
+                        {products.map((p) => (
+                          <td className="n" key={p} title={`${c} · ${p}`}>
+                            {val(mine.filter((o) => o.pr === p).length)}
+                          </td>
+                        ))}
+                        <td className="tot">{mine.length}</td>
+                      </tr>
+                    )
+                  })}
+                  {clients.length ? (
+                    <tr>
+                      <td style={{ fontWeight: 700 }}>All clients</td>
+                      {products.map((p) => (
+                        <td className="tot" key={p}>
+                          {os.filter((o) => o.pr === p).length || '—'}
+                        </td>
+                      ))}
+                      <td className="tot corner">{os.length}</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </MatrixTable>
+            </div>
+          </Card>
+
+          {products.length ? (
+            <Card padded top={14}>
+              <Label>Product mix — {scope}</Label>
+              {products
+                .map((p) => ({ p, n: os.filter((o) => o.pr === p).length }))
+                .sort((a, b) => b.n - a.n)
+                .map((r) => (
+                  <BarRow
+                    key={r.p}
+                    cols="170px 1fr 74px"
+                    padding="5px 0"
+                    label={
+                      <>
+                        {r.p}{' '}
+                        <span style={{ fontSize: 'var(--t-label)' }}>{PRODUCTS.find((x) => x.id === r.p)?.n}</span>
+                      </>
+                    }
+                    value={r.n}
+                    max={os.length}
+                    color="var(--brand2)"
+                    right={
+                      <>
+                        {r.n} · {os.length ? Math.round((r.n / os.length) * 100) : 0}%
+                      </>
+                    }
+                  />
+                ))}
+            </Card>
+          ) : null}
+        </>
+      ) : null}
+    </>
+  )
+}

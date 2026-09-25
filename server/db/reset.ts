@@ -1,12 +1,3 @@
-/**
- * Empties every table without touching the schema.
- *
- *   npm run db:reset && npm run db:seed
- *
- * Runs as the owner, which holds BYPASSRLS — the policies would otherwise scope
- * the truncate to the workspace you happen to be inside, which is not what
- * "reset" means. Used by the integration tests to get a known starting point.
- */
 import { sql } from 'drizzle-orm'
 import { createDb } from './connect'
 
@@ -33,7 +24,6 @@ async function main() {
     return
   }
 
-  /* One statement so the foreign keys never see a half-empty database. */
   const list = rows.map((r) => `"${r.tablename}"`).join(', ')
   await db.execute(sql.raw(`truncate table ${list} restart identity cascade`))
   console.log(`reset ${rows.length} tables`)

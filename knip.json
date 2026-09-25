@@ -3,6 +3,8 @@
   "entry": [
     "api/index.ts",
     "scripts/*.mjs",
+    "src/**/*.test.ts",
+    "server/**/*.test.ts",
     "tests/**/*.test.ts"
   ],
   "project": [
@@ -12,5 +14,11 @@
     "api/**/*.ts",
     "scripts/*.mjs",
     "tests/**/*.ts"
-  ]
+  ],
+  "ignoreIssues": {
+    "src/data/{business,catalog,hrms,org,people,production}.ts": [
+      "exports",
+      "types"
+    ]
+  }
 }

@@ -296,4 +296,3 @@ export const CLIENTS: Client[] = [
     active: true,
   },
 ]
-

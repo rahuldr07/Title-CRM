@@ -713,4 +713,3 @@ export const SITES: Site[] = [
   { k: "blr", n: "Bengaluru office", lat: 12.9279, lng: 77.6271, radius: 250 },
   { k: "hyd", n: "Hyderabad desk", lat: 17.4435, lng: 78.3772, radius: 250 },
 ]
-

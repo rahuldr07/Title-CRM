@@ -6,12 +6,6 @@ import { needs, type Ctx } from '../context'
 
 export const businessRoutes = new Hono<Ctx>()
 
-/**
- * Clients, invoicing and the lead pipeline. All of it sits behind `pricing`:
- * what a client is charged is not something the production floor needs, and the
- * sidebar hides these for the same reason.
- */
-
 businessRoutes.get('/clients', needs('pricing'), async (c) => {
   const rows = await withTenant(c.get('tenantId'), (tx) =>
     tx.select().from(clients).orderBy(asc(clients.code)),
@@ -71,8 +65,6 @@ businessRoutes.get('/leads', needs('pricing'), async (c) => {
       .leftJoin(people, eq(people.id, leadNotes.authorId))
       .orderBy(desc(leadNotes.at))
 
-    /* Staleness is derived from the notes rather than stored, so a lead nobody
-       has touched cannot quietly look fresh. */
     return all.map((l) => {
       const mine = notes.filter((n) => n.leadId === l.id)
       return { ...l, notes: mine, lastTouchedAt: mine[0]?.at ?? l.createdAt }

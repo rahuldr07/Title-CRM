@@ -15,7 +15,6 @@ import type { Ctx } from '../context'
 
 export const referenceRoutes = new Hono<Ctx>()
 
-/** The roster, with the departments each person belongs to. */
 referenceRoutes.get('/people', async (c) => {
   const rows = await withTenant(c.get('tenantId'), async (tx) => {
     const staff = await tx
@@ -78,7 +77,6 @@ referenceRoutes.get('/products', async (c) => {
   return c.json(rows)
 })
 
-/** Counties with their recorder links, which is how the coverage screens read. */
 referenceRoutes.get('/counties', async (c) => {
   const rows = await withTenant(c.get('tenantId'), async (tx) => {
     const cs = await tx.select().from(counties).orderBy(asc(counties.state), asc(counties.name))
@@ -91,7 +89,6 @@ referenceRoutes.get('/counties', async (c) => {
   return c.json(rows)
 })
 
-/** Just the links, for the monitor — it groups by status rather than by county. */
 referenceRoutes.get('/links', async (c) => {
   const rows = await withTenant(c.get('tenantId'), (tx) =>
     tx

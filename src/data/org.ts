@@ -277,4 +277,3 @@ export const PRIOR_COVERAGE: Record<string, Coverage> = {
 export const COVSTAGES: string[] = ["Search", "Search QC"]
 
 export const COTABS: string[] = ["Company", "Staff", "Clients", "Departments", "Roles", "Workflow", "Turnaround & SLA", "Payroll"]
-

@@ -12,6 +12,8 @@
     "noEmit": true,
 
     "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
@@ -22,5 +24,6 @@
 
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
   },
-  "include": ["vite.config.ts", "drizzle.config.ts", "server", "api"]
+  "include": ["vite.config.ts", "drizzle.config.ts", "server", "api"],
+  "exclude": ["server/**/*.test.ts"]
 }

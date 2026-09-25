@@ -1,24 +1,8 @@
-/**
- * What each write endpoint will accept.
- *
- * Kept apart from the handlers, and free of any database import, for two
- * reasons: a route that reaches straight into `c.req.json()` tends to trust the
- * shape it hoped for, and validation that needs Postgres to test is validation
- * nobody runs. These are pure functions over an unknown value, so the rules can
- * be read in one place and exercised without a server.
- *
- * Every one of them returns a reason rather than a boolean. The reason is what
- * the caller sees, and "400 Bad Request" on its own has never helped anybody.
- */
-
 export type Read<T> = { ok: true; value: T } | { ok: false; error: string }
 
 const asObject = (body: unknown): Record<string, unknown> | null =>
   body && typeof body === 'object' && !Array.isArray(body) ? (body as Record<string, unknown>) : null
 
-/* ── assigning a stage ──────────────────────────────────────────────────── */
-
-/** `null` clears the stage; a string names the person. Nothing else is a value. */
 export function readAssignee(body: unknown): Read<{ assigneeId: string | null }> {
   const b = asObject(body)
   if (!b) return { ok: false, error: 'Expected an object' }
@@ -30,8 +14,6 @@ export function readAssignee(body: unknown): Read<{ assigneeId: string | null }>
   return { ok: true, value: { assigneeId: value } }
 }
 
-/* ── deciding leave ─────────────────────────────────────────────────────── */
-
 export type Decision = 'approved' | 'rejected'
 
 export function readDecision(body: unknown): Read<Decision> {
@@ -42,8 +24,6 @@ export function readDecision(body: unknown): Read<Decision> {
   }
   return { ok: true, value: status }
 }
-
-/* ── requesting a loan or advance ───────────────────────────────────────── */
 
 export interface LoanRequestInput {
   kind: 'loan' | 'advance'
@@ -74,8 +54,6 @@ export function readLoanRequest(body: unknown): Read<LoanRequestInput> {
   return { ok: true, value: { kind: b.kind, amount, emi, note } }
 }
 
-/* ── toggling a rule ────────────────────────────────────────────────────── */
-
 export function readEnabled(body: unknown): Read<boolean> {
   const b = asObject(body)
   if (typeof b?.enabled !== 'boolean') {
@@ -84,9 +62,6 @@ export function readEnabled(body: unknown): Read<boolean> {
   return { ok: true, value: b.enabled }
 }
 
-/* ── workspace settings ─────────────────────────────────────────────────── */
-
-/** One company-wide date format; effective dates are legally material. */
 export const DATE_FORMATS = ['MM/DD/YYYY', 'DD/MM/YYYY'] as const
 
 export interface SettingsPatch {
@@ -95,13 +70,6 @@ export interface SettingsPatch {
   onTimeTarget?: number
 }
 
-/**
- * Built field by field rather than handed the request body.
- *
- * `set(body)` wrote whatever arrived — an unknown key reached the query builder
- * as an unknown column, and an empty object threw where it should have been a
- * refusal. Naming the three settable columns makes both impossible.
- */
 export function readSettings(body: unknown): Read<SettingsPatch> {
   const b = asObject(body)
   if (!b) return { ok: false, error: 'Expected an object of settings' }
@@ -115,8 +83,6 @@ export function readSettings(body: unknown): Read<SettingsPatch> {
   }
   if (b.slaBufferPct !== undefined) {
     const n = Number(b.slaBufferPct)
-    /* A buffer of 100% leaves the stages no time at all, so the bound is strict
-       at the top and the SLA planner can divide by what is left. */
     if (!Number.isFinite(n) || n < 0 || n >= 100) {
       return { ok: false, error: 'The buffer is a percentage of the promise, so it must be under 100' }
     }

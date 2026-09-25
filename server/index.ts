@@ -11,18 +11,6 @@ import { hrmsRoutes } from './routes/hrms'
 import { businessRoutes } from './routes/business'
 import { configRoutes } from './routes/config'
 
-/**
- * The API the front end talks to. Three rules run through all of it:
- *
- *  - Nothing touches the database outside `withTenant`, so every query is scoped
- *    by row-level security rather than by remembering a WHERE clause.
- *  - Capabilities are checked against our own tables, never against a claim in
- *    the token.
- *  - A route that serves both a personal and a company view narrows to the
- *    caller rather than refusing, so "my payslips" and "the pay run" are the
- *    same endpoint answering honestly to two different people.
- */
-
 const app = new Hono<Ctx>()
 
 app.use(
@@ -33,17 +21,10 @@ app.use(
   }),
 )
 
-/* Better Auth mounts its own routes, and they run before authentication for the
-   obvious reason: signing in cannot require being signed in. */
 app.on(['GET', 'POST'], '/api/auth/*', (c) => auth.handler(c.req.raw))
 
-/* Deliberately unauthenticated: a health check that needs credentials cannot be
-   used by the thing that decides whether to route traffic here. */
 app.get('/api/health', (c) => c.json({ ok: true }))
 
-/* Order matters. Everything under /api needs a session; the memberships route
-   is mounted between the two checks because it is what a client calls to find
-   out which workspace to ask for. Everything after it needs a workspace too. */
 app.use('/api/*', requireSession)
 app.route('/api', preflightRoutes)
 app.use('/api/*', requireWorkspace)
@@ -57,11 +38,6 @@ app.route('/api/config', configRoutes)
 
 const port = Number(process.env.PORT ?? 8787)
 
-/**
- * Check the connection before accepting a single request. If this role can
- * bypass row-level security, every policy silently stops applying and the
- * server looks entirely healthy — so the only safe response is to not start.
- */
 export const start = () =>
   Promise.resolve()
     .then(assertAuthSecretIsSet)
@@ -72,10 +48,6 @@ export const start = () =>
       }),
     )
 
-/* Not started on import, so the tests can mount the same app without binding a
-   port or racing each other for one — and so the Vercel function, which imports
-   this module for its `app`, does not try to bind a port it has no business
-   binding. That entry runs the same role check on its first request instead. */
 if (process.env.NODE_ENV !== 'test' && !process.env.VITEST && !process.env.VERCEL) {
   start().catch((e: unknown) => {
     console.error(e instanceof Error ? e.message : e)

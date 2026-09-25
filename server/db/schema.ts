@@ -13,15 +13,6 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 
-/**
- * Every business table carries `tenantId`, and row-level security is enforced in
- * Postgres against `current_setting('app.tenant_id')` — see `rls.sql`. Application
- * code that forgets a WHERE clause therefore cannot leak one company's orders to
- * another; the database refuses rather than trusting the query.
- */
-
-/* ── auth (Better Auth owns these four) ─────────────────────────────────── */
-
 export const user = pgTable('user', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
@@ -41,7 +32,6 @@ export const session = pgTable('session', {
   expiresAt: timestamp('expires_at').notNull(),
   ipAddress: text('ip_address'),
   userAgent: text('user_agent'),
-  /** Which workspace this session is currently inside. */
   activeTenantId: uuid('active_tenant_id'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -74,14 +64,11 @@ export const verification = pgTable('verification', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })
 
-/* ── tenancy and permissions (ours, not the auth provider's) ────────────── */
-
 export const tenants = pgTable('tenants', {
   id: uuid('id').primaryKey().defaultRandom(),
   slug: text('slug').notNull().unique(),
   name: text('name').notNull(),
   plan: text('plan').notNull(),
-  /** Home state of the title company. */
   state: text('state').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })
@@ -96,16 +83,11 @@ export const roles = pgTable(
     key: text('key').notNull(),
     name: text('name').notNull(),
     description: text('description').notNull().default(''),
-    /** Built-in roles a company may rename but not delete. */
     locked: boolean('locked').notNull().default(false),
   },
   (t) => [uniqueIndex('roles_tenant_key').on(t.tenantId, t.key)],
 )
 
-/**
- * Capabilities are rows, not an enum column — a company can add its own on top of
- * the built-ins, and the permission matrix screen reads straight from here.
- */
 export const rolePermissions = pgTable(
   'role_permissions',
   {
@@ -124,20 +106,17 @@ export const people = pgTable(
     tenantId: uuid('tenant_id')
       .notNull()
       .references(() => tenants.id, { onDelete: 'cascade' }),
-    /** Null until the person has accepted their invitation. */
     userId: text('user_id').references(() => user.id, { onDelete: 'set null' }),
     ref: text('ref').notNull(),
     name: text('name').notNull(),
     email: text('email').notNull(),
     roleId: uuid('role_id').references(() => roles.id),
-    /** Orders they can hold in a day. */
     capacity: integer('capacity').notNull().default(0),
     availability: text('availability').notNull().default('ok'),
     shift: text('shift').notNull().default('day'),
     active: boolean('active').notNull().default(true),
     levelId: uuid('level_id'),
     joinedOn: date('joined_on'),
-    /** Annual cost to company, in minor units of the payroll currency. */
     ctc: integer('ctc'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
@@ -154,9 +133,7 @@ export const departments = pgTable(
     key: text('key').notNull(),
     name: text('name').notNull(),
     description: text('description').notNull().default(''),
-    /** Part of the automatic assignment pass. */
     auto: boolean('auto').notNull().default(true),
-    /** The stage this department QCs, which is what the self-review rule keys off. */
     pairs: text('pairs'),
     position: integer('position').notNull().default(0),
   },
@@ -176,8 +153,6 @@ export const peopleDepartments = pgTable(
   (t) => [primaryKey({ columns: [t.personId, t.departmentId] })],
 )
 
-/* ── catalog and coverage ───────────────────────────────────────────────── */
-
 export const products = pgTable(
   'products',
   {
@@ -187,9 +162,7 @@ export const products = pgTable(
       .references(() => tenants.id, { onDelete: 'cascade' }),
     code: text('code').notNull(),
     name: text('name').notNull(),
-    /** Fee in USD. */
     fee: numeric('fee', { precision: 10, scale: 2 }).notNull(),
-    /** SLA in hours. */
     slaHours: integer('sla_hours').notNull().default(24),
   },
   (t) => [uniqueIndex('products_tenant_code').on(t.tenantId, t.code)],
@@ -221,7 +194,6 @@ export const counties = pgTable(
       .references(() => tenants.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     state: text('state').notNull(),
-    /** County index used on recorder sites; null where the county publishes none. */
     idx: integer('idx'),
   },
   (t) => [uniqueIndex('counties_tenant_place').on(t.tenantId, t.state, t.name)],
@@ -239,7 +211,6 @@ export const countyLinks = pgTable(
       .references(() => counties.id, { onDelete: 'cascade' }),
     kind: text('kind').notNull(),
     url: text('url').notNull().default(''),
-    /** ok · slow · moved · auth · broken · none · unchecked */
     status: text('status').notNull().default('unchecked'),
     error: text('error'),
     checkedAt: timestamp('checked_at'),
@@ -247,7 +218,6 @@ export const countyLinks = pgTable(
   (t) => [uniqueIndex('county_links_county_kind').on(t.countyId, t.kind)],
 )
 
-/** A grade: which states, counties and products somebody may be given. */
 export const levels = pgTable('levels', {
   id: uuid('id').primaryKey().defaultRandom(),
   tenantId: uuid('tenant_id')
@@ -255,13 +225,10 @@ export const levels = pgTable('levels', {
     .references(() => tenants.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   note: text('note').notNull().default(''),
-  /** null means every state; likewise for products. */
   states: jsonb('states').$type<string[] | null>(),
   counties: jsonb('counties').$type<Record<string, string[]>>().notNull().default({}),
   products: jsonb('products').$type<string[] | null>(),
 })
-
-/* ── production ─────────────────────────────────────────────────────────── */
 
 export const orders = pgTable(
   'orders',
@@ -270,7 +237,6 @@ export const orders = pgTable(
     tenantId: uuid('tenant_id')
       .notNull()
       .references(() => tenants.id, { onDelete: 'cascade' }),
-    /** Client-reference style, e.g. 4192254-2. Unique inside a workspace. */
     ref: text('ref').notNull(),
     clientId: uuid('client_id')
       .notNull()
@@ -286,11 +252,9 @@ export const orders = pgTable(
     borrower: text('borrower'),
     effectiveDate: date('effective_date'),
     receivedAt: timestamp('received_at').notNull().defaultNow(),
-    /** Computed from the product's SLA at intake, then editable. */
     dueAt: timestamp('due_at').notNull(),
     deliveredAt: timestamp('delivered_at'),
     fee: numeric('fee', { precision: 10, scale: 2 }).notNull(),
-    /** Why the clock is paused, when it is. */
     holdReason: text('hold_reason'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
@@ -301,7 +265,6 @@ export const orders = pgTable(
   ],
 )
 
-/** One row per stage of an order: the six-slot strip on the register. */
 export const orderStages = pgTable(
   'order_stages',
   {
@@ -315,11 +278,9 @@ export const orderStages = pgTable(
     departmentId: uuid('department_id')
       .notNull()
       .references(() => departments.id),
-    /** Null until somebody is placed on it. */
     assigneeId: uuid('assignee_id').references(() => people.id, { onDelete: 'set null' }),
     startedAt: timestamp('started_at'),
     finishedAt: timestamp('finished_at'),
-    /** The trace the engine recorded when it placed — or refused to place — this stage. */
     decision: jsonb('decision').$type<{ rule: string; note: string }[]>(),
   },
   (t) => [
@@ -345,8 +306,6 @@ export const orderEvents = pgTable(
   },
   (t) => [index('order_events_order').on(t.orderId, t.at)],
 )
-
-/* ── business ───────────────────────────────────────────────────────────── */
 
 export const invoices = pgTable(
   'invoices',
@@ -378,7 +337,6 @@ export const leads = pgTable('leads', {
   location: text('location').notNull().default(''),
   status: text('status').notNull().default('new'),
   ownerId: uuid('owner_id').references(() => people.id, { onDelete: 'set null' }),
-  /** Raised by hand; staleness is derived from the notes instead. */
   flagged: boolean('flagged').notNull().default(false),
   contacts: jsonb('contacts').$type<{ name: string; role: string; email: string; phone: string }[]>()
     .notNull()
@@ -402,8 +360,6 @@ export const leadNotes = pgTable(
   },
   (t) => [index('lead_notes_lead').on(t.leadId, t.at)],
 )
-
-/* ── HRMS ───────────────────────────────────────────────────────────────── */
 
 export const leaveRequests = pgTable(
   'leave_requests',
@@ -442,7 +398,6 @@ export const attendance = pgTable(
     present: integer('present').notNull(),
     paidLeave: integer('paid_leave').notNull().default(0),
     unpaid: integer('unpaid').notNull().default(0),
-    /** What payroll actually pays for — this is the only number the run reads. */
     payableDays: integer('payable_days').notNull(),
   },
   (t) => [uniqueIndex('attendance_person_period').on(t.personId, t.period)],
@@ -456,7 +411,6 @@ export const payRuns = pgTable(
       .notNull()
       .references(() => tenants.id, { onDelete: 'cascade' }),
     period: text('period').notNull(),
-    /** draft → locked → approved → paid */
     state: text('state').notNull().default('draft'),
     published: boolean('published').notNull().default(false),
     approvedById: uuid('approved_by_id').references(() => people.id, { onDelete: 'set null' }),
@@ -481,7 +435,6 @@ export const payslips = pgTable(
     gross: numeric('gross', { precision: 12, scale: 2 }).notNull(),
     deductions: numeric('deductions', { precision: 12, scale: 2 }).notNull(),
     net: numeric('net', { precision: 12, scale: 2 }).notNull(),
-    /** The earning and deduction lines, as computed at the moment the run locked. */
     lines: jsonb('lines').$type<{ label: string; amount: number; kind: 'earn' | 'deduct' }[]>()
       .notNull()
       .default([]),
@@ -497,7 +450,6 @@ export const pettyCash = pgTable(
       .notNull()
       .references(() => tenants.id, { onDelete: 'cascade' }),
     at: timestamp('at').notNull().defaultNow(),
-    /** credit · debit */
     kind: text('kind').notNull(),
     description: text('description').notNull(),
     amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
@@ -518,12 +470,10 @@ export const loans = pgTable(
     personId: uuid('person_id')
       .notNull()
       .references(() => people.id, { onDelete: 'cascade' }),
-    /** loan · advance */
     kind: text('kind').notNull(),
     amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
     emi: numeric('emi', { precision: 12, scale: 2 }).notNull(),
     paid: numeric('paid', { precision: 12, scale: 2 }).notNull().default('0'),
-    /** requested · active · paused · closed · rejected */
     status: text('status').notNull().default('requested'),
     note: text('note').notNull().default(''),
     requestedAt: timestamp('requested_at').notNull().defaultNow(),
@@ -534,7 +484,6 @@ export const loans = pgTable(
   (t) => [index('loans_tenant_person').on(t.tenantId, t.personId)],
 )
 
-/** One month's instalment as it was actually recovered through a payroll run. */
 export const loanPayments = pgTable(
   'loan_payments',
   {
@@ -586,8 +535,6 @@ export const candidates = pgTable(
   (t) => [index('candidates_opening').on(t.openingId)],
 )
 
-/* ── engine configuration ───────────────────────────────────────────────── */
-
 export const assignmentRules = pgTable('assignment_rules', {
   id: uuid('id').primaryKey().defaultRandom(),
   tenantId: uuid('tenant_id')
@@ -595,12 +542,10 @@ export const assignmentRules = pgTable('assignment_rules', {
     .references(() => tenants.id, { onDelete: 'cascade' }),
   key: text('key').notNull(),
   name: text('name').notNull(),
-  /** block · prefer · route · cover */
   kind: text('kind').notNull(),
   enabled: boolean('enabled').notNull().default(true),
   locked: boolean('locked').notNull().default(false),
   position: integer('position').notNull().default(0),
-  /** The condition is data, so the sentence shown to a user cannot disagree with it. */
   condition: jsonb('condition').$type<{ stage?: string; product?: string; state?: string }>(),
   pool: jsonb('pool').$type<string[]>(),
   statement: text('statement').notNull().default(''),
@@ -614,11 +559,9 @@ export const slaRules = pgTable('sla_rules', {
   clientId: uuid('client_id').references(() => clients.id, { onDelete: 'cascade' }),
   productId: uuid('product_id').references(() => products.id, { onDelete: 'cascade' }),
   hours: integer('hours').notNull().default(24),
-  /** The fallback when no client- or product-specific rule matches. */
   isDefault: boolean('is_default').notNull().default(false),
 })
 
-/** Share of an order's budget each stage gets, plus the slack held back. */
 export const stageBudgets = pgTable(
   'stage_budgets',
   {
@@ -640,7 +583,6 @@ export const tenantSettings = pgTable('tenant_settings', {
     .primaryKey()
     .references(() => tenants.id, { onDelete: 'cascade' }),
   dateFormat: text('date_format').notNull().default('MM/DD/YYYY'),
-  /** Percentage of the SLA held back as slack before the stages divide the rest. */
   slaBufferPct: integer('sla_buffer_pct').notNull().default(10),
   onTimeTarget: integer('on_time_target').notNull().default(98),
   payroll: jsonb('payroll').$type<Record<string, unknown>>().notNull().default({}),

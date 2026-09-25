@@ -7,15 +7,6 @@ import { readEnabled, readSettings } from './validate'
 
 export const configRoutes = new Hono<Ctx>()
 
-/**
- * What the engine is configured to do — rules, turnaround promises and the share
- * of each promise a stage gets.
- *
- * These are rows rather than constants because the Company screen edits them,
- * and because a rule whose condition is data cannot disagree with the sentence
- * shown next to it.
- */
-
 configRoutes.get('/rules', async (c) => {
   const rows = await withTenant(c.get('tenantId'), (tx) =>
     tx.select().from(assignmentRules).orderBy(asc(assignmentRules.position)),
@@ -32,9 +23,6 @@ configRoutes.post('/rules/:id', needs('config'), async (c) => {
     const [rule] = await tx.select().from(assignmentRules).where(eq(assignmentRules.id, id)).limit(1)
     if (!rule) return { error: 'Not found' as const }
 
-    /* Some rules are the reason the system can be trusted — department
-       membership, self-review, fill-the-emptiest. They may be read and
-       inspected, and they may not be switched off. */
     if (rule.locked) return { error: `"${rule.name}" cannot be switched off` as const }
 
     await tx

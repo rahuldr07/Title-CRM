@@ -33,7 +33,7 @@ export type StatusMap = Record<string, [string, string]>
 export type ChipKind = 'n' | 'b' | 'v' | 'r' | 'd'
 export type LabelMap = Record<string, [string, ChipKind]>
 
-export type Availability = 'ok' | 'leave' | 'shift'
+type Availability = 'ok' | 'leave' | 'shift'
 
 export interface Bank {
   acct: string
@@ -41,7 +41,7 @@ export interface Bank {
   name: string
 }
 
-export interface Emergency {
+interface Emergency {
   n: string
   rel: string
   mob: string
@@ -74,28 +74,6 @@ export interface Person {
   leaving?: Date
 }
 
-export const newPerson = (): Person => ({
-  id: '',
-  n: '',
-  dep: [],
-  r: 'staff',
-  cap: 0,
-  open: 0,
-  avail: 'ok',
-  active: true,
-  shift: 'day',
-  mob: '',
-  addr: '',
-  emg: { n: '', rel: '', mob: '' },
-  aadhaar: '',
-  doj: '',
-  dob: '',
-  pan: '',
-  uan: '',
-  esicNo: '',
-  bank: { acct: '', ifsc: '', name: '' },
-  e: '',
-})
 
 export interface Shift {
   k: string
@@ -209,6 +187,7 @@ export interface Order {
   fee: number
   age: string
   done?: boolean
+  sentAt?: Date
   flag?: string
 
   ref?: string
@@ -266,7 +245,7 @@ export interface LeadContact {
   main?: boolean
 }
 
-export interface LeadNote {
+interface LeadNote {
   who?: string
   w?: string
   at: Date
@@ -321,7 +300,6 @@ export interface LateMark {
   id: string
   who: string
   d: Date
-  dk: string
   shift: string
   due: string
   at: string
@@ -330,7 +308,7 @@ export interface LateMark {
   waived: boolean
 }
 
-export type PunchKind = 'in' | 'out' | 'break out' | 'break in'
+type PunchKind = 'in' | 'out' | 'break out' | 'break in'
 
 export interface Punch {
   who: string
@@ -352,7 +330,7 @@ export interface LeaveType {
   d: string
 }
 
-export interface LeaveClash {
+interface LeaveClash {
   dep: string
   left: number
   team: number
@@ -581,7 +559,7 @@ export interface EngineConfig {
   onChange: 'new' | 'all'
 }
 
-export type EngineOption = [string, string, string]
+type EngineOption = [string, string, string]
 export type EngineOptions = Record<keyof EngineConfig, EngineOption[]>
 
 export interface LinkCheckConfig {

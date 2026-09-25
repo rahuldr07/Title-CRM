@@ -1,24 +1,3 @@
-/**
- * Loads every route in a real browser and reports anything that fails to render
- * or throws.
- *
- *   npm run build && npm run preview &
- *   npm run smoke
- *
- * This needs the whole application standing up, which is why CI gives it a job of
- * its own: a production build served on the origin `SMOKE_URL` names (`vite
- * preview` on 4173 by default), the API on 8787 for the preview server to proxy
- * `/api` to, a seeded database to sign in against, and `APP_URL` set to that same
- * preview origin — Better Auth trusts the origin it names, and defaults to the
- * dev server's, so every sign-in is otherwise refused as a foreign one.
- *
- * It is here because a route can typecheck, lint, pass its unit tests and still
- * render an empty page — lazy chunks, a bad import, a hook order that only breaks
- * at runtime. Those cost minutes to find this way and an afternoon to find any
- * other way.
- *
- * A fresh browser per route keeps one bad page from taking the run down with it.
- */
 import { chromium } from 'playwright'
 
 const BASE = process.env.SMOKE_URL ?? 'http://localhost:4173'
@@ -28,19 +7,12 @@ const routes = [
   '/reports', '/company', '/leads', '/billing', '/mywork', '/intake',
   '/commitment', '/leave', '/payslips', '/hiring', '/petty', '/integ', '/onboard',
   '/signin', '/myperf', '/mypay', '/orders/new',
-  /* The root only redirects, but a broken redirect is a blank application. */
   '/',
-  /* The payslip document, which is reached from a row in the payroll run. */
   '/payslips/pd',
-  /* Detail screens, reached from a register row. */
   '/staff/pd', '/clients/MGR', '/leads/l1', '/leads/new',
-  /* And the not-found path each of them has to handle. */
   '/staff/nobody', '/clients/NOPE', '/leads/nope',
 ]
 
-/* Some sandboxes cannot spawn the usual multi-process browser. `--single-process`
-   is the fallback for those, but it makes the browser itself fragile enough to
-   drop pages mid-run, so it is opt-in rather than the default. */
 const launchOptions = {
   args: [
     '--no-sandbox',
@@ -52,28 +24,9 @@ const launchOptions = {
   ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
 }
 
-/*
- * Every route is behind sign-in, so without a session this walks thirty-three
- * redirects to the same form and reports them all as rendering fine — which is
- * how this check quietly stopped testing anything the day sign-in landed.
- *
- * It signs in the way a person does: the real form, against Better Auth, against
- * the database. There is no back door left to use — the seed session that used
- * to serve here is refused unless the demonstration flag is on, which is the
- * point of it being refused. So this needs the API and a seeded database:
- *
- *   npm run server                       # with DATABASE_URL and friends set
- *   npm run build && npm run preview
- *   npm run smoke
- *
- * Harry Whitfield is the one identity that reaches every route; signing in as
- * anyone narrower turns half this list into permission redirects, which is the
- * same blindness in different clothes.
- */
 const EMAIL = process.env.SMOKE_EMAIL ?? 'harry.whitfield@keystoneabstract.com'
 const PASSWORD = process.env.SMOKE_PASSWORD ?? 'titlecrm-dev'
 
-/** Signs in once and hands back the cookies, so each route need not repeat it. */
 async function signIn() {
   const browser = await chromium.launch(launchOptions)
   try {
@@ -114,8 +67,6 @@ for (const route of routes) {
     page.on('pageerror', (e) => problems.push(`${route} threw :: ${e.message}`))
     page.on('console', (m) => {
       const text = m.text()
-      /* A missing favicon and a refused API call are expected when the front end
-         is running on seed data with no server behind it. */
       if (m.type() === 'error' && !/favicon|Failed to load resource|net::ERR/.test(text)) {
         problems.push(`${route} logged :: ${text}`)
       }
@@ -128,9 +79,6 @@ for (const route of routes) {
     const text = (await page.locator('main').innerText().catch(() => '')).trim()
     const heading = text.split('\n').filter(Boolean)[0] ?? '(empty)'
 
-    /* A route that bounced to the sign-in form is not a route that rendered.
-       Without this the run counts every redirect as a pass, which is exactly how
-       this check spent a stretch proving nothing at all. */
     const bounced = /^email$/i.test(heading) && /password/i.test(text)
 
     if (bounced) problems.push(`${route} bounced to the sign-in form`)

@@ -1,25 +1,9 @@
-/**
- * Screenshots every screen worth looking at, in light and dark, at desktop and
- * phone widths.
- *
- *   npm run build && npm run preview &
- *   npm run shots
- *
- * This exists because the last round of design work found four defects by
- * looking at the screens and none by reading the code — a timeline whose
- * timestamps sat on top of the author's name, two back buttons stacked on top of
- * each other, a screen that was mostly empty space, and a table column that
- * wrapped on some rows and not others. All four are invisible in a diff.
- *
- * Output goes to ./shots (git-ignored) unless SHOTS_DIR says otherwise.
- */
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
 
 const BASE = process.env.SMOKE_URL ?? 'http://localhost:4173'
 const OUT = process.env.SHOTS_DIR ?? 'shots'
 
-/** [name, route, width, dark] */
 const shots = [
   ['dash', '/dash', 1440, false],
   ['dash-dark', '/dash', 1440, true],
@@ -52,8 +36,6 @@ for (const [name, route, width, dark] of shots) {
   await page.setViewportSize({ width, height: width < 700 ? 900 : 1000 })
   await page.goto(BASE + route, { waitUntil: 'domcontentloaded', timeout: 15_000 })
   await page.waitForSelector('main', { timeout: 10_000 })
-  /* Long enough for the on-demand delivery history to land, so the tiles that
-     read from it are captured with figures rather than skeletons. */
   await page.waitForTimeout(1600)
   if (dark) {
     await page.evaluate(() => document.body.classList.add('dark'))
